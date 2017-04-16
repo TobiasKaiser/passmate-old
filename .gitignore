@@ -1,6 +1,5 @@
 *.a
-CMakeCache.txt
-CMakeFiles
-cmake_install.cmake
-Makefile
+*.o
+*.d
+*.d.*
 .DS_store
