@@ -7,7 +7,7 @@ class Application : public wxApp {
 
         virtual bool OnInit();
         virtual int OnExit();
-        
+
 };
 
 wxDECLARE_APP(Application); // this defines wxGetApp

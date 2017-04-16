@@ -1,14 +1,17 @@
 #pragma once
 #include <wx/wx.h>
-#include <wx/notebook.h>
 
 class MainWindow : public wxFrame {
     public:
         MainWindow();
+    protected:
+        void InitMenu();
+
+        wxScrolledWindow *panelRecord;
+        wxFlexGridSizer *sizerRecord;
+        void UpdateRecordPanel();
+
     private:
         void OnClose(wxCommandEvent& event);
-        void OnResize(wxSizeEvent& evt);
 
-
-        wxPanel *panel;
 };
