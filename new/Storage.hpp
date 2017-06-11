@@ -1,8 +1,22 @@
+#pragma once
+
+#include <fstream>
+#include <string>
+#include <vector>
+#include <map>
+#include "Record.hpp"
+
+#include "json/json.hpp"
+
+//namespace nlohmann {
+//	class json;
+//}
+
 class Storage {
 	public:
 
 		// Constructor and file-level functions
-		void Storage(std::string filename, bool create);
+		Storage(std::string filename, bool create);
 		void Close();
 
 		void Save();
@@ -22,10 +36,16 @@ class Storage {
 		void MoveRecord(std::string const &new_path, std::string const &old_path);
 		void RecordSet(std::string const &path, std::string const &key, std::vector<std::string> const &values);
 		void RecordUnset(std::string const &path, std::string const &key);
+
+		void PrintAllRecords();
 	
 	protected:
 		void RecordSetRaw(std::string const &path, std::string const &key, std::vector<std::string> const &values);
 		std::string GenerateNewRID();
 		std::map<std::string, Record> GetAllRecords();
 
-}
+		nlohmann::json data;
+		nlohmann::json config; 
+
+		std::string passphrase;
+};

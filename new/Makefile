@@ -2,7 +2,7 @@ CXX=$(shell wx-config --cxx)
 CXXFLAGS+=-Wall -I/usr/local/include -Wfatal-errors
 CXXFLAGS+=$(shell wx-config  --cppflags core,base,gl) -DGLEW_BUILD=GLEW_STATIC
 #CXXFLAGS+=-I/usr/include/machine # we need this for <endian.h>?!?!
-CXXFLAGS+=-g -O3 # debug me
+CXXFLAGS+=-g -O0 # debug me
 #CXXFLAGS+=-std=c++11 -stdlib=libc++
 
 LIBS+=$(shell wx-config --libs)

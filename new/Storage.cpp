@@ -1,7 +1,29 @@
-#include <fstream>
+#include "Storage.hpp"
 
+using json = nlohmann::json;
+using namespace std;
+Storage::Storage(string filename, bool create) {
+	ifstream f(filename);
+	json j;
+	
 
-void Storage::Storage(std::string filename, bool create) {
+	try {
+		if (f.is_open()) {
+			f >> j;
+			//cout << j.dump(4) << endl;
+
+			data = j[0];
+			config = j[1];
+
+			GetAllRecords();
+			
+			PrintAllRecords();
+		}
+	}
+	catch( const exception & ex ) {
+		cerr << ex.what() << endl;
+	}
+
 
 }
 /*
@@ -49,12 +71,68 @@ void Storage::Storage(std::string filename, bool create) {
 
 
 // This is a real cheating function, but as long as it works well, it will probably stay here.
-std::map<std::string, Record> Storage::GetAllRecords() {
+map<string, Record> Storage::GetAllRecords() {
+	map<string, Record> all_records;
 
+	json::iterator record_it, field_it, vect_it;
+
+	for(record_it = data.begin(); record_it != data.end(); record_it++) {
+		string record_id = record_it.key();
+		json field_array = record_it.value();
+
+
+		Record new_record(record_id);
+		for(field_it=field_array.begin(); field_it != field_array.end(); field_it++) {
+			json vect = field_it.value();
+
+			string vect_name = vect[0];
+			long long vect_timestamp = vect[1];
+
+			vector<string> vect_value;
+
+			for(vect_it=vect.begin() + 2;vect_it != vect.end(); vect_it++) {
+				vect_value.push_back(vect_it.value());
+			}
+
+			new_record.UpdateByVect(vect_name, vect_timestamp, vect_value);
+			
+		}
+
+		if(all_records.count(new_record.GetPath())) {
+			throw runtime_error("Storage loaded with invalid JSON: Duplicate PATH detected.");
+		} else {	
+			all_records[new_record.GetPath()] = new_record;
+		}
+
+	}
+
+	return all_records;
 }
 
-Record Storage::GetRecord(std::string const &path) {
-	
+
+void Storage::PrintAllRecords() {
+	map<string, Record> all_records = GetAllRecords();
+
+	for(map<string, Record>::value_type &rec_pair : all_records) {
+		Record &rec = rec_pair.second;
+		const string &path = rec_pair.first;
+
+		cout << path << "\n";
+
+		rec.PrintRecord();
+
+		cout << "\n";
+	}
+}
+
+Record Storage::GetRecord(string const &path) {
+	map<string, Record> all_records = GetAllRecords();
+
+	if(all_records.count(path)) {
+		return all_records[path];
+	} else {
+		throw runtime_error("GetRecord called on nonexistent PATH.");
+	}
 }
 
 /*
@@ -80,7 +158,7 @@ Record Storage::GetRecord(std::string const &path) {
 		return records
 */
 
-void Storage::SetPassphrase(std::string new_passphrase) {
+void Storage::SetPassphrase(string new_passphrase) {
 
 }
 /*
@@ -146,7 +224,7 @@ void Storage::Save() {
 		return path
 */
 /*
-json Storage::MergeRecords(const json &local, const json &remote, const std::string &rid) {
+json Storage::MergeRecords(const json &local, const json &remote, const string &rid) {
 
 }
 */
@@ -209,7 +287,7 @@ json Storage::MergeRecords(const json &local, const json &remote, const std::str
  * Here comes the real core stuff
  **************************************************************************/
 
-void Storage::NewRecord(std::string const &path) {
+void Storage::NewRecord(string const &path) {
 
 }
 
@@ -224,7 +302,7 @@ void Storage::NewRecord(std::string const &path) {
 */
 
 
-std::string Storage::GenerateNewRID() {
+string Storage::GenerateNewRID() {
 
 }
 
@@ -236,7 +314,7 @@ std::string Storage::GenerateNewRID() {
 				return rid
 */
 
-bool Storage::CheckPassphrase(std::string const &check) {
+bool Storage::CheckPassphrase(string const &check) {
 	return check==passphrase;
 }
 
@@ -245,16 +323,22 @@ bool Storage::CheckPassphrase(std::string const &check) {
 		return check==self.passphrase
 */
 
-bool Storage::PathExists(std::string const &path) {
+bool Storage::PathExists(string const &path) {
+	map<string, Record> all_records =  GetAllRecords();
 
+	return all_records.count(path);
 }
 
-/*	
-	def path_exists(self, path):
-		return path in  self.list()
-*/
+vector<string> Storage::List() {
+	map<string, Record> all_records =  GetAllRecords();
 
-std::vector<Record> Storage::List() {
+	vector<string> ret;
+
+	for(map<string, Record>::value_type &v : all_records) {
+		ret.push_back(v.first);
+	}
+
+	return ret;
 
 }
 
@@ -263,7 +347,7 @@ std::vector<Record> Storage::List() {
 		return self.get_all_records().keys()
 */
 
-void Storage::DeleteRecord(std::string &path) {
+void Storage::DeleteRecord(string &path) {
 
 }
 
@@ -272,7 +356,7 @@ void Storage::DeleteRecord(std::string &path) {
 		self._record_set_without_underscore(path, "PATH", [])
 */
 
-void Storage::MoveRecord(std::string const &new_path, std::string const &old_path) {
+void Storage::MoveRecord(string const &new_path, string const &old_path) {
 
 }
 
@@ -288,7 +372,7 @@ void Storage::MoveRecord(std::string const &new_path, std::string const &old_pat
 		raise BackendError(BackendError.NOT_IMPLEMENTED) # TODO
 */
 
-void Storage::RecordSetRaw(std::string const &path, std::string const &key, std::vector<std::string> const &values) {
+void Storage::RecordSetRaw(string const &path, string const &key, vector<string> const &values) {
 
 }
 
@@ -304,7 +388,7 @@ void Storage::RecordSetRaw(std::string const &path, std::string const &key, std:
 		self.changed=True
 */
 
-void Storage::RecordSet(std::string const &path, std::string const &key, std::vector<std::string> const &values) {
+void Storage::RecordSet(string const &path, string const &key, vector<string> const &values) {
 
 }
 
@@ -313,7 +397,7 @@ void Storage::RecordSet(std::string const &path, std::string const &key, std::ve
 		self._record_set_without_underscore(path, "_%s"%key, vals)
 */
 
-void Storage::RecordUnset(std::string const &path, std::string const &key) {
+void Storage::RecordUnset(string const &path, string const &key) {
 
 }
 

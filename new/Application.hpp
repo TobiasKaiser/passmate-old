@@ -1,6 +1,9 @@
 #pragma once
 #include <wx/wx.h>
 
+
+class Storage;
+
 class Application : public wxApp {
     public:
         Application();
@@ -8,6 +11,8 @@ class Application : public wxApp {
         virtual bool OnInit();
         virtual int OnExit();
 
+    protected:
+        Storage *storage;
 };
 
 wxDECLARE_APP(Application); // this defines wxGetApp
