@@ -15,9 +15,9 @@ Storage::Storage(string filename, bool create) {
 			data = j[0];
 			config = j[1];
 
-			GetAllRecords();
+			//GetAllRecords();
 			
-			PrintAllRecords();
+			//PrintAllRecords();
 		}
 	}
 	catch( const exception & ex ) {
@@ -97,6 +97,9 @@ map<string, Record> Storage::GetAllRecords() {
 			new_record.UpdateByVect(vect_name, vect_timestamp, vect_value);
 			
 		}
+
+		if(new_record.IsHidden())
+			continue;
 
 		if(all_records.count(new_record.GetPath())) {
 			throw runtime_error("Storage loaded with invalid JSON: Duplicate PATH detected.");
@@ -335,6 +338,7 @@ vector<string> Storage::List() {
 	vector<string> ret;
 
 	for(map<string, Record>::value_type &v : all_records) {
+
 		ret.push_back(v.first);
 	}
 

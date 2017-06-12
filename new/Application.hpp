@@ -11,6 +11,14 @@ class Application : public wxApp {
         virtual bool OnInit();
         virtual int OnExit();
 
+        Storage &GetStorage() {
+        	if(storage) {
+        		return *storage;
+ 			} else {
+ 				throw std::runtime_error("No Storage object found.");
+ 			}
+        }
+
     protected:
         Storage *storage;
 };

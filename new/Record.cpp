@@ -84,11 +84,28 @@ Record::Record(std::string record_id) {
 	this->record_id = record_id;
 }
 
+bool Record::IsHidden() {
+	if(values.count("PATH")) {
+		if(values["PATH"].second.size()<1 || values["PATH"].second[0].size()<1) {
+			return true;
+		} else {
+			return false;
+		}
+	} else {
+		return true;
+	}
+}
+
+
 std::string Record::GetPath() {
 	if(values.count("PATH")) {
-		return values["PATH"].second[0];
+		if(values["PATH"].second.size()<1 || values["PATH"].second[0].size()<1) {
+			return "@DeletedRecord/"+GetId();
+		} else {
+			return values["PATH"].second[0];
+		}
 	} else {
-		return "???RID="+GetId();
+		return "@UnnamedRecord/"+GetId(); //RID="+GetId();
 	}
 }
 

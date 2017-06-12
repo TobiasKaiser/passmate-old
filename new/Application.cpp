@@ -13,7 +13,7 @@ bool Application::OnInit() {
     if(!wxApp::OnInit())
         return false;
 
-    storage=new Storage("test.pmate", false);
+    storage=new Storage("/home/tobias/pmate_copy2.pmate", false);
 
 
     new MainWindow();

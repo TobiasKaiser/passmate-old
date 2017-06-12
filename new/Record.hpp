@@ -23,6 +23,8 @@ class Record {
 
 		void PrintRecord();
 
+		bool IsHidden(); // True if deleted or no PATH set. 
+
 		// This function is for the GUI to get the data from what is in the record at the moment. Changes have to be done via the Storage class.
 		std::map<std::string, std::vector<std::string>> GetFields();
 
