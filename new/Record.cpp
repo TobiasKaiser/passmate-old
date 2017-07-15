@@ -15,14 +15,11 @@ void Record::UpdateByVect(std::string vect_name, long long vect_timestamp, std::
 		long long prev_timestamp = prev.first;
 
 		if(prev_timestamp > vect_timestamp) {
-			cout << "exists, no update\n";
 			doUpdate = false;
 		} else {
-			cout << "exists, update\n";
 			doUpdate = true;
 		}
 	} else {
-		cout << "does not exist, update\n";
 		doUpdate = true;
 	}
 

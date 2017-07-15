@@ -6,9 +6,9 @@
 
 #include <wx/wx.h>
 
-
-
 #include <wx/treectrl.h>
+
+#include "Record.hpp"
 
 class MainWindow : public wxFrame {
     public:
@@ -19,7 +19,7 @@ class MainWindow : public wxFrame {
         wxScrolledWindow *panelRecord;
         wxFlexGridSizer *sizerRecord;
         wxTreeCtrl *recordTree;
-        void UpdateRecordPanel();
+        void UpdateRecordPanel(Record &record);
         void UpdateRecordTree();
 
 
@@ -29,6 +29,8 @@ class MainWindow : public wxFrame {
        		IRTNode(IRTNode *parent, std::string node_name);
        		IRTNode *GetChildForceCreate(std::string new_node_name);
        		void AppendToTreeCtrl(wxTreeCtrl *tree);
+       		MainWindow::IRTNode *FindByItemId(const wxTreeItemId &search_id);
+
 
        		static std::vector<std::string> SplitPath(std::string path);
 
@@ -38,7 +40,12 @@ class MainWindow : public wxFrame {
        		std::list<IRTNode> children;
        		wxTreeItemId item_id;
        		IRTNode *parent;
+       		bool path_connected;
         };
+
+        IRTNode irt_root;
+
+        void OnRecordActivated(wxTreeEvent& event);
 
     private:
         void OnClose(wxCommandEvent& event);

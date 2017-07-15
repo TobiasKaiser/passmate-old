@@ -12,7 +12,9 @@
 using namespace std;
 
 MainWindow::MainWindow()
-    : wxFrame(NULL, wxID_ANY, wxT("Passmate"), wxDefaultPosition, wxSize(0, 0)) {
+    : wxFrame(NULL, wxID_ANY, wxT("Passmate"), wxDefaultPosition, wxSize(0, 0))
+    , irt_root(NULL, "")
+{
     
     // Panels
     wxSplitterWindow *splittermain = new wxSplitterWindow(this,wxID_ANY,wxDefaultPosition,wxDefaultSize,wxSP_3D);
@@ -71,7 +73,8 @@ MainWindow::MainWindow()
     sizerRight->Add(sizerButtonsRight,0,wxLEFT|wxRIGHT|wxBOTTOM|wxEXPAND,5);
     panelRight->SetSizer(sizerRight);
 
-   
+
+    recordTree->Connect(wxID_ANY, wxEVT_TREE_ITEM_ACTIVATED, wxTreeEventHandler(MainWindow::OnRecordActivated), NULL, this);
 
     sizerRecord=new wxFlexGridSizer(6, 5, 5); // 6 cols, 5 pixel horizontal and vertical padding
 
@@ -79,7 +82,7 @@ MainWindow::MainWindow()
     // Do the menu thing
     InitMenu();
 
-    UpdateRecordPanel();
+    //UpdateRecordPanel();
 
     UpdateRecordTree();
 
@@ -88,12 +91,32 @@ MainWindow::MainWindow()
     //panelRecord->ShowScrollbars(wxSHOW_SB_ALWAYS, wxSHOW_SB_ALWAYS);
 }
 
+/*
+void MainWindow::OnFilterUpdate() {
+
+}
+*/
+
+void MainWindow::OnRecordActivated(wxTreeEvent& event) {
+    IRTNode *selected = irt_root.FindByItemId(event.GetItem());
+    if(selected && selected->path_connected) {
+          Storage &st = wxGetApp().GetStorage();
+
+          Record r = st.GetRecord(selected->full_path);
+
+          r.PrintRecord();
+
+          UpdateRecordPanel(r);
+    }    
+}
+
 MainWindow::IRTNode::IRTNode(IRTNode *parent, std::string node_name) {
     this->parent = parent;
 
     this->node_name=node_name;
 
-    full_path="..."; // Todo: Do this in reverse order with a stack
+    full_path="";
+    path_connected = false;
 
     search_flag = true;
 }
@@ -126,6 +149,21 @@ std::vector<std::string> MainWindow::IRTNode::SplitPath(std::string path) {
     return ret;
 }
 
+MainWindow::IRTNode *MainWindow::IRTNode::FindByItemId(const wxTreeItemId &search_id){
+    if(item_id == search_id)
+        return this;
+
+    for(IRTNode &child : children) {
+        IRTNode *result;
+        result = child.FindByItemId(search_id);
+
+        if(result)
+            return result;
+    }
+
+    return NULL;
+}
+
 void MainWindow::IRTNode::AppendToTreeCtrl(wxTreeCtrl *tree) {
     if(parent) {
         item_id = tree->AppendItem(parent->item_id, node_name);
@@ -146,28 +184,29 @@ void MainWindow::UpdateRecordTree() {
 
     //wxTreeItemId root_id=recordTree->AddRoot("passmate db");
 
-    IRTNode irt_root(NULL, "passmate db");
+    //IRTNode irt_root(NULL, "passmate db");
+    irt_root = IRTNode(NULL, "passmate db");
 
-    for (const string &s : st.List()) {
-        vector<string> vs = IRTNode::SplitPath(s);
+    for (const string &path : st.List()) {
+        vector<string> path_split = IRTNode::SplitPath(path);
         int i;
 
         IRTNode *cur = &irt_root;
 
-        for(i=0;i<vs.size();i++) {
-            cur = cur->GetChildForceCreate(vs[i]);
+        for(i=0;i<path_split.size();i++) {
+            cur = cur->GetChildForceCreate(path_split[i]);
         }
 
-        
+        cur->full_path = path;
+        cur->path_connected = true;
     }
 
     irt_root.AppendToTreeCtrl(recordTree);
-
 }
 
-void MainWindow::UpdateRecordPanel() {
+void MainWindow::UpdateRecordPanel(Record &record) {
     int i;
-    for(i=0;i<30;i++) {
+    for(i=0;i<5;i++) {
         // Make Widgets
         wxStaticText *label=new wxStaticText(panelRecord, wxID_ANY, _T("Password:"));
         wxTextCtrl *entry=new wxTextCtrl( panelRecord, wxID_ANY, wxT(""), wxDefaultPosition, wxDefaultSize, 0);
@@ -193,6 +232,13 @@ void MainWindow::UpdateRecordPanel() {
     }
     panelRecord->SetSizer(sizerRecord);
     panelRecord->SetScrollRate(10, 10);
+
+
+    sizerRecord->Layout();
+
+    Show();
+
+    Refresh();
 }
 
 void MainWindow::InitMenu() {
