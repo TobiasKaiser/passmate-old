@@ -93,7 +93,7 @@ class Storage:
 			self.save()
 		else:
 			if self.raw:
-				json_in=json.load(f)
+				json_in=json.load(self.f)
 				
 			else:
 				ciphertext=self.f.read()
