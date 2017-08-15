@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <string>
+#include <iostream>
 #include <vector>
 #include <map>
 #include "Record.hpp"
