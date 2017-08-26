@@ -248,6 +248,8 @@ void MainWindow::UpdateRecordTree() {
 
 void MainWindow::UpdateRecordPanel() {
 
+    sizerRecord->Clear(true);
+
     std::map<std::string, std::vector<std::string>> fields = cur_record.GetFields();
 
 
@@ -255,6 +257,19 @@ void MainWindow::UpdateRecordPanel() {
     wxTextCtrl *entry;
     wxButton *buttonGenerate, *buttonHide, *buttonCopy, *buttonRemove;
 
+    // Path
+    label=new wxStaticText(panelRecord, wxID_ANY, std::string("Path:"));
+    sizerRecord->Add(label, 0, wxALIGN_CENTER_VERTICAL|wxALIGN_RIGHT, 0);   
+    label=new wxStaticText(panelRecord, wxID_ANY, cur_record.GetPath());
+    sizerRecord->Add(label,0, wxEXPAND|wxTOP|wxBOTTOM, 0);
+
+    sizerRecord->AddSpacer(0);
+    sizerRecord->AddSpacer(0);
+    sizerRecord->AddSpacer(0);
+    sizerRecord->AddSpacer(0);
+
+
+    // RID
     label=new wxStaticText(panelRecord, wxID_ANY, std::string("RID:"));
     sizerRecord->Add(label, 0, wxALIGN_CENTER_VERTICAL|wxALIGN_RIGHT, 0);   
     label=new wxStaticText(panelRecord, wxID_ANY, cur_record.GetId());
@@ -268,33 +283,56 @@ void MainWindow::UpdateRecordPanel() {
 
     for(auto const &cur : fields) {
         // Make Widgets
+        if(cur.second.size() < 1) {
+            // TODO: Handle this case this should not be occuring.
+            continue;
+        }
+
+
         label=new wxStaticText(panelRecord, wxID_ANY, cur.first+std::string(":"));
-        entry=new wxTextCtrl( panelRecord, wxID_ANY, wxT(""), wxDefaultPosition, wxDefaultSize, 0);
+        sizerRecord->Add(label, 0, wxALIGN_CENTER_VERTICAL|wxALIGN_RIGHT, 0);   
+
+        entry=new wxTextCtrl( panelRecord, wxID_ANY, cur.second[0], wxDefaultPosition, wxDefaultSize, 0);
+        entry->SetMinSize(wxSize(30, 30));
+        sizerRecord->Add(entry, 1, wxEXPAND, 0);
+
+        int i;
+        for(i=1;i<cur.second.size();i++) {
+            // with multi value fields, add the buttons in the last row
+            sizerRecord->AddSpacer(0);
+            sizerRecord->AddSpacer(0);
+            sizerRecord->AddSpacer(0);
+            sizerRecord->AddSpacer(0);
+
+
+            // do not repeat the label in the next line
+            sizerRecord->AddSpacer(0);
+
+            // and the second value :)
+            entry=new wxTextCtrl( panelRecord, wxID_ANY, cur.second[i], wxDefaultPosition, wxDefaultSize, 0);
+            entry->SetMinSize(wxSize(30, 30));
+            sizerRecord->Add(entry, 1, wxEXPAND, 0);
+        }
+
         buttonGenerate=new wxButton(panelRecord, wxID_ANY, _T("G"));
         buttonHide=new wxButton(panelRecord, wxID_ANY, _T("H"));
         buttonCopy=new wxButton(panelRecord, wxID_ANY, _T("C"));
         buttonRemove=new wxButton(panelRecord, wxID_ANY, _T("X"));
-        
         buttonGenerate->SetMinSize(wxSize(30, 30));
         buttonHide->SetMinSize(wxSize(30, 30));
         buttonCopy->SetMinSize(wxSize(30, 30));
         buttonRemove->SetMinSize(wxSize(30, 30));
-
-        //entry->SetMinSize(wxSize(300, 30));
-
-        // Add to sizer
-        sizerRecord->Add(label, 0, wxALIGN_CENTER_VERTICAL|wxALIGN_RIGHT, 0);   
-        sizerRecord->Add(entry, 1, wxEXPAND, 0);
         sizerRecord->Add(buttonGenerate, 0, 0, 0);
         sizerRecord->Add(buttonHide, 0, 0, 0);
         sizerRecord->Add(buttonCopy, 0, 0, 0);
         sizerRecord->Add(buttonRemove, 0, 0, 0);
 
-        sizerRecord->ShowItems(true);
 
     }
     
 
+
+    sizerRecord->ShowItems(true);
 
 
     panelRecord->Layout();
