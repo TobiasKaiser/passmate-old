@@ -1,10 +1,17 @@
 #pragma once
 
+
+
 #include <fstream>
 #include <string>
 #include <iostream>
 #include <vector>
 #include <map>
+
+
+#include <mbedtls/entropy.h>
+#include <mbedtls/ctr_drbg.h>
+
 #include "Record.hpp"
 
 #include "json/json.hpp"
@@ -15,6 +22,7 @@
 
 class Storage {
 	public:
+
 
 		// Constructor and file-level functions
 		Storage(std::string filename, bool create);
@@ -40,6 +48,33 @@ class Storage {
 
 		void PrintAllRecords();
 	
+		void InitCryptoStuff();
+
+		class Exception: public std::exception {
+			public:
+
+				enum Err {
+					FILE_ALREADY_EXISTS=1,
+					NOT_IMPLEMENTED=2,
+					PATH_ALREADY_EXISTS=3,
+					NEWER_VALUE_ALREADY_EXISTS=4,
+					MERGE_ERROR_DUPLICATE_PATH=5,
+					MERGE_ERROR_DUPLICATE_TIME=6,
+					MULTIPLE_INSTANCES_RUNNING=7,
+					CRYPTO_ERROR=8
+				};
+
+				Exception(enum Err errCode) throw();
+
+				Err getErrCode();
+
+
+				const char* what() const throw();
+			private:
+				enum Err errCode;
+		};
+
+
 	protected:
 		void RecordSetRaw(std::string const &path, std::string const &key, std::vector<std::string> const &values);
 		std::string GenerateNewRID();
@@ -49,4 +84,12 @@ class Storage {
 		nlohmann::json config; 
 
 		std::string passphrase;
+
+		mbedtls_entropy_context my_entropy_ctx;
+		mbedtls_ctr_drbg_context my_prng_ctx;
+    
+    	bool changed;
+
+    	std::string filename;
+
 };

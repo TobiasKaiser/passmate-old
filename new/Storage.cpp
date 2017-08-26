@@ -1,31 +1,55 @@
+
 #include "Storage.hpp"
+
+#include <ctime>
+#include <cstdio>
 
 using json = nlohmann::json;
 using namespace std;
-Storage::Storage(string filename, bool create) {
-	ifstream f(filename);
-	json j;
-	
 
+Storage::Storage(string filename, bool create) {
+	changed = false;
+	
+	InitCryptoStuff();
+	//GenerateNewRID();
+
+	this->filename = filename;
+
+	json j;
+
+	ifstream f(filename);
+	
 	try {
 		if (f.is_open()) {
 			f >> j;
-			//cout << j.dump(4) << endl;
-
 			data = j[0];
-			config = j[1];
-
-			//GetAllRecords();
-			
-			//PrintAllRecords();
+			config = j[1];;
 		}
 	}
 	catch( const exception & ex ) {
+		// TODO
 		cerr << ex.what() << endl;
 	}
-
-
 }
+
+void Storage::InitCryptoStuff() {
+	mbedtls_entropy_init(&my_entropy_ctx);
+
+	
+    mbedtls_ctr_drbg_init( &my_prng_ctx );
+
+    int ret = mbedtls_ctr_drbg_seed(&my_prng_ctx , mbedtls_entropy_func, &my_entropy_ctx, NULL, 0);
+    if( ret != 0 )
+    {
+        // TODO: Error handling here
+   		cout << "error" << endl;
+    }
+
+   	cout << "init crypt stuff done" << endl;
+
+	
+}
+
 /*
 	def __init__(self, filename, passphrase=None, create=False):
 		self.filename=filename
@@ -182,6 +206,27 @@ void Storage::Close() {
 
 
 void Storage::Save() {
+	if(!changed)
+		return;
+
+	cout << "saving!" << endl;
+
+	string tmp_filename = filename + ".prev";
+	rename(filename.c_str(), tmp_filename.c_str());
+
+	ofstream f(filename);
+	
+	try {
+		if (f.is_open()) {
+			f << json({ data, config });
+		}
+	}
+	catch( const exception & ex ) {
+		// TODO
+		cerr << ex.what() << endl;
+	}
+			//cout << j.dump(4) << endl;
+
 
 }
 /*
@@ -291,40 +336,44 @@ json Storage::MergeRecords(const json &local, const json &remote, const string &
  **************************************************************************/
 
 void Storage::NewRecord(string const &path) {
+	if(PathExists(path)) {
+		throw Exception(Exception::PATH_ALREADY_EXISTS);
+	}
+	data[GenerateNewRID()]={ {"PATH", time(NULL), path} };
+
+	changed = true;
 
 }
-
-/*		
-	def new_record(self, path):
-		if self.path_exists(path):
-			raise BackendError(BackendError.PATH_ALREADY_EXISTS)
-		self.data[self._generate_new_rid()]=[
-			["PATH", int(time.time()), path]
-		]
-		self.changed=True
-*/
-
 
 string Storage::GenerateNewRID() {
+	uint32_t newRid = 0;
+	string newRidStr;
 
+
+	do {
+		int ret;
+		ret = mbedtls_ctr_drbg_random(&my_prng_ctx, (unsigned char*) &newRid, sizeof(uint32_t));
+
+		if(ret)
+		{
+			// TODO: Error handling
+			cout << "Error handling todo" << endl;
+		}
+
+		cout << newRid << endl;
+
+		newRidStr = to_string(newRid);
+
+	} while(data.count(newRidStr) > 0); // this is very unlikely to loop, only if we hit a used spot in the 32 bit RID space.
+
+
+	return newRidStr;
 }
 
-/*
-	def _generate_new_rid(self):
-		while True:
-			rid=str(random.randint(0, 2**32))
-			if not rid in self.data.keys():			
-				return rid
-*/
 
 bool Storage::CheckPassphrase(string const &check) {
 	return check==passphrase;
 }
-
-/*	
-	def check_passphrase(self, check):
-		return check==self.passphrase
-*/
 
 bool Storage::PathExists(string const &path) {
 	map<string, Record> all_records =  GetAllRecords();
@@ -345,11 +394,6 @@ vector<string> Storage::List() {
 	return ret;
 
 }
-
-/*		
-	def list(self):
-		return self.get_all_records().keys()
-*/
 
 void Storage::DeleteRecord(string &path) {
 
@@ -409,3 +453,32 @@ void Storage::RecordUnset(string const &path, string const &key) {
 	def record_unset(self, path, key):
 		self.record_set(path, key, [])
 */
+
+
+
+Storage::Exception::Exception(Storage::Exception::Err errCode) throw()
+{
+	this->errCode = errCode;
+}
+
+Storage::Exception::Err Storage::Exception::getErrCode()
+{
+	return errCode;
+}
+
+const char* Storage::Exception::what() const throw()
+{
+	switch(errCode) {
+		case CRYPTO_ERROR: return "Error with crypto functions.";
+		case FILE_ALREADY_EXISTS: return "File already exists.";
+		case NOT_IMPLEMENTED: return "Not implemented.";
+		case PATH_ALREADY_EXISTS: return "Path already exists.";
+		case NEWER_VALUE_ALREADY_EXISTS: return "Newer value already exists.";
+		case MERGE_ERROR_DUPLICATE_PATH: return "Merge error: Duplicate path.";
+		case MERGE_ERROR_DUPLICATE_TIME: return "Merge error: Duplicate time.";
+		case MULTIPLE_INSTANCES_RUNNING: return "Mulitple instances running.";
+		
+		default: return "???";
+	}
+}
+	

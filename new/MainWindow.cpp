@@ -389,10 +389,20 @@ void MainWindow::OnClose(wxCommandEvent& WXUNUSED(event)) {
 
 void MainWindow::OnButtonAddRecord(wxCommandEvent &evt)
 {
+    Storage &st = wxGetApp().GetStorage();
+
+
     wxTextEntryDialog recordNameDialog(this, wxT("New record name:"));
     if (recordNameDialog.ShowModal() == wxID_OK) {
+
         cout << "Name:" << recordNameDialog.GetValue() << endl;
+
+        st.NewRecord(string(recordNameDialog.GetValue()));
+        st.Save();
+
+        UpdateRecordTree();
     }
+
 }
 
 void MainWindow::OnButtonSync(wxCommandEvent &evt)

@@ -5,7 +5,7 @@ CXXFLAGS+=$(shell wx-config  --cppflags core,base,gl) -DGLEW_BUILD=GLEW_STATIC
 CXXFLAGS+=-g -O0 # debug me
 #CXXFLAGS+=-std=c++11 -stdlib=libc++
 
-LIBS+=$(shell wx-config --libs)
+LIBS+=$(shell wx-config --libs) -lscrypt -lmbedtls -lmbedcrypto
 LDFLAGS=$(CXXFLAGS)
 TARGET=passmate
 SRC=$(wildcard *.cpp)
