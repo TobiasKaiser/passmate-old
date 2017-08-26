@@ -1,6 +1,8 @@
 #include "Record.hpp"
+#include "Storage.hpp"
 
 #include <iostream>
+#include <sstream>
 
 using namespace std;
 
@@ -108,4 +110,49 @@ std::string Record::GetPath() {
 
 std::string Record::GetId() {
 	return record_id;
+}
+
+string Record::SetNewFieldsToStorage(Storage &dest, map<string, vector<string>> &newFields, bool dryRun) {
+	stringstream changeSummary;
+
+	map<string, vector<string>> oldFields = GetFields();
+
+	string path = GetPath();
+
+	// Set new fields
+    for(auto const &curField : newFields) {
+    	if(oldFields.count(curField.first) == 0) {
+    		changeSummary << "New field: " << curField.first << endl;
+    		if(!dryRun) {
+    			dest.RecordSet(path, curField.first, curField.second);
+    		}
+    	}
+    }
+
+	// Update existing fields
+    // Set new fields
+    for(auto const &curField : newFields) {
+    	if(oldFields.count(curField.first) > 0) {
+    		if(oldFields[curField.first] != curField.second) {
+    			changeSummary << "Changed field: " << curField.first << endl;
+    			if(!dryRun) {
+    				dest.RecordSet(path, curField.first, curField.second);
+    			}
+    		} else {
+    			//changeSummary << "Unchanged field: " << curField.first << endl;
+    		}
+    	}
+    }
+
+	// Delete old fields
+	for(auto const &curField : oldFields) {
+		if(newFields.count(curField.first) == 0) {
+			changeSummary << "Deleted field: " << curField.first << endl;
+			if(!dryRun) {
+				dest.RecordUnset(path, curField.first);
+			}
+		}
+	}
+
+	return changeSummary.str();
 }

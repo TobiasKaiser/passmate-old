@@ -49,6 +49,8 @@ class MainWindow : public wxFrame {
         std::map<std::string, std::vector<wxTextCtrl*>> cur_record_text_ctrls;
 
 
+        std::map<std::string, std::vector<std::string>> GetGUIRecord();
+
         void OnRecordActivated(wxTreeEvent& event);
         void OnButtonAddRecord(wxCommandEvent &evt);
         void OnButtonSync(wxCommandEvent &evt);
@@ -61,4 +63,9 @@ class MainWindow : public wxFrame {
     private:
         void OnClose(wxCommandEvent& event);
         void OnSize(wxSizeEvent& event);
+
+        void addFieldToPanel(std::string key, std::vector<std::string> values);
+
+        bool isPasswordField(std::string key);
+
 };

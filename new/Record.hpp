@@ -1,8 +1,11 @@
 #pragma once
 
+
 #include <string>
 #include <vector>
 #include <map>
+
+class Storage;
 
 class Record {
 	public:
@@ -27,6 +30,8 @@ class Record {
 
 		// This function is for the GUI to get the data from what is in the record at the moment. Changes have to be done via the Storage class.
 		std::map<std::string, std::vector<std::string>> GetFields();
+
+		std::string SetNewFieldsToStorage(Storage &dest, std::map<std::string, std::vector<std::string>> &newFields, bool dryRun);
 
 	protected:
 		std::map<std::string, std::pair<long long,std::vector<std::string>>> values;

@@ -1,4 +1,6 @@
 #include <sstream>
+#include <regex>
+#include <string>
 
 #include "MainWindow.hpp"
 #include "Application.hpp"
@@ -263,10 +265,8 @@ void MainWindow::UpdateRecordPanel() {
 
     std::map<std::string, std::vector<std::string>> fields = cur_record.GetFields();
 
-
     wxStaticText *label;
-    wxTextCtrl *entry;
-    wxButton *buttonGenerate, *buttonHide, *buttonCopy, *buttonRemove;
+
 
     // Path
     label=new wxStaticText(panelRecord, wxID_ANY, std::string("Path:"));
@@ -293,23 +293,43 @@ void MainWindow::UpdateRecordPanel() {
 
 
     for(auto const &cur : fields) {
-        // Make Widgets
-        if(cur.second.size() < 1) {
-            // TODO: Handle this case this should not be occuring.
-            continue;
-        }
+        addFieldToPanel(cur.first, cur.second);
 
-        cur_record_text_ctrls[cur.first] = vector<wxTextCtrl*>();
+    }
+    
 
-        label=new wxStaticText(panelRecord, wxID_ANY, cur.first+std::string(":"));
-        sizerRecord->Add(label, 0, wxALIGN_CENTER_VERTICAL|wxALIGN_RIGHT, 0);   
 
-        entry=new wxTextCtrl( panelRecord, wxID_ANY, cur.second[0], wxDefaultPosition, wxDefaultSize, 0);
-        entry->SetMinSize(wxSize(30, 30));
-        sizerRecord->Add(entry, 1, wxEXPAND, 0);
-        cur_record_text_ctrls[cur.first].push_back(entry);
+    sizerRecord->ShowItems(true);
+    panelRecord->Layout();
+    sizerRecord->FitInside(panelRecord);
+    Refresh();
 
-        for(unsigned i=1;i<cur.second.size();i++) {
+}
+
+bool MainWindow::isPasswordField(std::string key) {
+    regex passwordRegex("^password");
+    return regex_match(key, passwordRegex);
+}
+
+void MainWindow::addFieldToPanel(std::string key, std::vector<std::string> values)
+{
+    wxStaticText *label;
+    wxTextCtrl *entry;
+    wxButton *buttonGenerate, *buttonHide, *buttonCopy, *buttonRemove;
+
+
+    if(values.size() < 1) {
+        // TODO: Handle this case this should not be occuring.
+        return;
+   }
+
+    cur_record_text_ctrls[key] = vector<wxTextCtrl*>();
+
+    label=new wxStaticText(panelRecord, wxID_ANY, key+std::string(":"));
+    sizerRecord->Add(label, 0, wxALIGN_CENTER_VERTICAL|wxALIGN_RIGHT, 0);   
+
+    for(unsigned i=0;i<values.size();i++) {
+        if(i > 0) {
             // with multi value fields, add the buttons in the last row
             sizerRecord->AddSpacer(0);
             sizerRecord->AddSpacer(0);
@@ -319,44 +339,32 @@ void MainWindow::UpdateRecordPanel() {
 
             // do not repeat the label in the next line
             sizerRecord->AddSpacer(0);
-
-            // and the second value :)
-            entry=new wxTextCtrl( panelRecord, wxID_ANY, cur.second[i], wxDefaultPosition, wxDefaultSize, 0);
-            entry->SetMinSize(wxSize(30, 30));
-            sizerRecord->Add(entry, 1, wxEXPAND, 0);
-            cur_record_text_ctrls[cur.first].push_back(entry);
         }
+        // and the second value :)
+        entry=new wxTextCtrl( panelRecord, wxID_ANY, values[i], wxDefaultPosition, wxDefaultSize, 0);
+        entry->SetMinSize(wxSize(30, 30));
+        sizerRecord->Add(entry, 1, wxEXPAND, 0);
+        cur_record_text_ctrls[key].push_back(entry);
+    }
 
+    if(isPasswordField(key)) {    
         buttonGenerate=new wxButton(panelRecord, wxID_ANY, _T("G"));
-        buttonHide=new wxButton(panelRecord, wxID_ANY, _T("H"));
-        buttonCopy=new wxButton(panelRecord, wxID_ANY, _T("C"));
-        buttonRemove=new wxButton(panelRecord, wxID_ANY, _T("X"));
+        buttonHide=new wxButton(panelRecord, wxID_ANY, _T("S"));
         buttonGenerate->SetMinSize(wxSize(30, 30));
         buttonHide->SetMinSize(wxSize(30, 30));
-        buttonCopy->SetMinSize(wxSize(30, 30));
-        buttonRemove->SetMinSize(wxSize(30, 30));
         sizerRecord->Add(buttonGenerate, 0, 0, 0);
         sizerRecord->Add(buttonHide, 0, 0, 0);
-        sizerRecord->Add(buttonCopy, 0, 0, 0);
-        sizerRecord->Add(buttonRemove, 0, 0, 0);
-
-
+    } else {
+        sizerRecord->AddSpacer(0);
+        sizerRecord->AddSpacer(0);
     }
-    
 
-
-    sizerRecord->ShowItems(true);
-
-
-    panelRecord->Layout();
-
-    sizerRecord->FitInside(panelRecord);
-
-    //Layout();
-
-    //Show();
-
-    Refresh();
+    buttonCopy=new wxButton(panelRecord, wxID_ANY, _T("C"));
+    buttonRemove=new wxButton(panelRecord, wxID_ANY, _T("X"));
+    buttonCopy->SetMinSize(wxSize(30, 30));
+    buttonRemove->SetMinSize(wxSize(30, 30));
+    sizerRecord->Add(buttonCopy, 0, 0, 0);
+    sizerRecord->Add(buttonRemove, 0, 0, 0);
 }
 
 void MainWindow::InitMenu() {
@@ -422,12 +430,66 @@ void MainWindow::OnButtonRename(wxCommandEvent &evt)
 
 void MainWindow::OnButtonAddField(wxCommandEvent &evt)
 {
+    wxTextEntryDialog fieldNameDialog(this, wxT("New field name:"));
+    wxTextEntryDialog valueCountDialog(this, wxT("Number of values:"));
+    valueCountDialog.SetValue("1");
+    if (fieldNameDialog.ShowModal() == wxID_OK) {
+        while(true) {
+            if(valueCountDialog.ShowModal() == wxID_OK) {
+                int count = atoi(valueCountDialog.GetValue());
 
+                if(count>0) {  
+                    std::vector<std::string> emptyValues;
+
+                    for(int i=0;i<count;i++) {
+                        emptyValues.push_back(std::string(""));
+                    }
+
+                    addFieldToPanel(string(fieldNameDialog.GetValue()), emptyValues);
+
+                    sizerRecord->ShowItems(true);
+                    panelRecord->Layout();
+                    sizerRecord->FitInside(panelRecord);
+                    Refresh();  
+
+                    break;
+                }
+            } else {
+                break;
+            }
+        }   
+    }
+    
+}
+
+
+std::map<std::string, std::vector<std::string>>  MainWindow::GetGUIRecord()
+{
+    std::map<std::string, std::vector<std::string>> ret;
+    for(auto const &curField : cur_record_text_ctrls) {
+        ret[curField.first] = vector<string>();
+        for(auto const &curValue : curField.second) {
+             ret[curField.first].push_back(string(curValue->GetValue()));
+        }
+    }
+
+    return ret;
 }
 
 void MainWindow::OnButtonSaveChanges(wxCommandEvent &evt)
 {
+    Storage &st = wxGetApp().GetStorage();
 
+    std::map<std::string, std::vector<std::string>> guiRecord = GetGUIRecord();
+
+    string proposedChanges = cur_record.SetNewFieldsToStorage(st, guiRecord, false);
+
+    wxMessageDialog confirmationDialog(this, wxString("Do you want to apply the following changes?\n" + proposedChanges), wxT("Save changes"), wxYES|wxNO|wxCENTRE);
+
+    if (confirmationDialog.ShowModal() == wxID_YES) {
+        cur_record.SetNewFieldsToStorage(st, guiRecord, false);
+        st.Save();
+    }    
 }
 
 void MainWindow::OnButtonHistory(wxCommandEvent &evt)

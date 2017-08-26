@@ -396,24 +396,17 @@ vector<string> Storage::List() {
 }
 
 void Storage::DeleteRecord(string &path) {
-
+	RecordSetRaw(path, "PATH", vector<string>());
 }
-
-/*
-	def delete_record(self, path):
-		self._record_set_without_underscore(path, "PATH", [])
-*/
 
 void Storage::MoveRecord(string const &new_path, string const &old_path) {
+	if(PathExists(new_path)) {
+		throw Exception(Exception::PATH_ALREADY_EXISTS); 
+	}
 
+	RecordSetRaw(old_path, "PATH", vector<string>({new_path}));
 }
 
-/*		
-	def move_record(self, new_path, old_path):
-		if self.path_exists(new_path):
-			raise BackendError(BackendError.PATH_ALREADY_EXISTS)
-		self._record_set_without_underscore(old_path, "PATH", [new_path])
-*/
 
 /*
 	def fix_times(self):
@@ -421,7 +414,20 @@ void Storage::MoveRecord(string const &new_path, string const &old_path) {
 */
 
 void Storage::RecordSetRaw(string const &path, string const &key, vector<string> const &values) {
+	string rid = GetAllRecords()[path].GetId();
 
+	// Todo: Check if newer value already exists. If it does, raise NEWER_VALUE_ALREADY_EXISTS exception.
+
+	// insertMe will be [key, time(NULL), values[0], values[1], ...]
+	json insertMe = json::array({key, time(NULL)});
+ 	for(const auto &val : values) {
+		insertMe.push_back(val);
+ 	}
+	
+ 	data[rid].push_back(insertMe);
+ 	cout << "yoyo" << endl;
+
+	changed = true;
 }
 
 /*
@@ -437,13 +443,8 @@ void Storage::RecordSetRaw(string const &path, string const &key, vector<string>
 */
 
 void Storage::RecordSet(string const &path, string const &key, vector<string> const &values) {
-
+	RecordSetRaw(path, "_" + key, values);
 }
-
-/*
-	def record_set(self, path, key, vals):
-		self._record_set_without_underscore(path, "_%s"%key, vals)
-*/
 
 void Storage::RecordUnset(string const &path, string const &key) {
 
