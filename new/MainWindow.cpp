@@ -21,7 +21,7 @@ MainWindow::MainWindow()
     wxPanel *panelLeft=new wxPanel(splittermain,wxID_ANY,wxDefaultPosition,wxDefaultSize,wxTAB_TRAVERSAL|wxNO_BORDER);
     wxPanel *panelRight=new wxPanel(splittermain,wxID_ANY,wxDefaultPosition,wxDefaultSize,wxTAB_TRAVERSAL|wxNO_BORDER);
     splittermain->SplitVertically(panelLeft, panelRight);
-    panelRecord=new wxScrolledWindow(panelRight,wxID_ANY,wxDefaultPosition,wxDefaultSize, 0);
+    panelRecord=new wxScrolledWindow(panelRight,wxID_ANY,wxDefaultPosition,wxDefaultSize, wxVSCROLL|wxBORDER_SUNKEN);
 
 
     // Widgets
@@ -39,9 +39,9 @@ MainWindow::MainWindow()
     wxButton *buttonHistory=new wxButton(panelRight, wxID_ANY, _T("History"));
 
     // Sizing
-    panelLeft->SetMinSize(wxSize(150, 200));
-    panelRight->SetMinSize(wxSize(250, 200));
-    splittermain->SetMinSize(wxSize(800, 500));
+    panelLeft->SetMinSize(wxSize(200, 200));
+    panelRight->SetMinSize(wxSize(500, 200));
+    splittermain->SetMinSize(wxSize(700, 400));
     splittermain->SetMinimumPaneSize(10);
     splittermain->SetSashPosition(250);
     splittermain->SetSashGravity(0.0); // When the main window is resized, resize only right panel.
@@ -49,7 +49,7 @@ MainWindow::MainWindow()
 
     // Sizer
     wxBoxSizer *windowSizer = new wxBoxSizer(wxVERTICAL);
-    windowSizer->Add(splittermain,1,wxBOTTOM|wxLEFT|wxEXPAND,5);
+    windowSizer->Add(splittermain,1,wxBOTTOM|wxLEFT|wxEXPAND,3);
     SetSizer(windowSizer);
     windowSizer->SetSizeHints(this);
 
@@ -61,6 +61,8 @@ MainWindow::MainWindow()
     sizerLeft->Add(buttonSync,0, wxEXPAND, 0);
     panelLeft->SetSizer(sizerLeft);
 
+    //sizerLeft->SetSizeHints(panelLeft);
+
     wxBoxSizer *sizerButtonsRight = new wxBoxSizer(wxHORIZONTAL);
     sizerButtonsRight->Add(buttonRename,1, wxEXPAND|wxRIGHT,5);
     sizerButtonsRight->Add(buttonRemove,1, wxEXPAND|wxRIGHT,5);
@@ -69,24 +71,40 @@ MainWindow::MainWindow()
     sizerButtonsRight->Add(buttonSaveChanges,1, wxEXPAND,0);
 
     wxBoxSizer *sizerRight=new wxBoxSizer(wxVERTICAL);
-    sizerRight->Add(panelRecord,1,wxALL|wxEXPAND,5);
-    sizerRight->Add(sizerButtonsRight,0,wxLEFT|wxRIGHT|wxBOTTOM|wxEXPAND,5);
+    sizerRight->Add(panelRecord,1,wxALL|wxEXPAND,2);
+    sizerRight->Add(sizerButtonsRight,0,wxLEFT|wxRIGHT|wxBOTTOM|wxEXPAND,2);
     panelRight->SetSizer(sizerRight);
+
+    //sizerRight->SetSizeHints(panelRight);
 
 
     recordTree->Connect(wxID_ANY, wxEVT_TREE_ITEM_ACTIVATED, wxTreeEventHandler(MainWindow::OnRecordActivated), NULL, this);
 
+
     sizerRecord=new wxFlexGridSizer(6, 5, 5); // 6 cols, 5 pixel horizontal and vertical padding
+    sizerRecord->AddGrowableCol(1);
+
+    
+    UpdateRecordPanel();
+
+
+    panelRecord->SetSizer(sizerRecord);
+    panelRecord->SetScrollRate(0, 10);
+
+    //sizerRecord->SetVirtualSizeHints(panelRecord);
 
     
     // Do the menu thing
     InitMenu();
 
-    //UpdateRecordPanel();
-
+    
     UpdateRecordTree();
 
     Show();
+
+    Connect( wxEVT_SIZE, wxSizeEventHandler( MainWindow::OnSize ) );
+
+
 
     //panelRecord->ShowScrollbars(wxSHOW_SB_ALWAYS, wxSHOW_SB_ALWAYS);
 }
@@ -97,16 +115,38 @@ void MainWindow::OnFilterUpdate() {
 }
 */
 
+void MainWindow::OnSize(wxSizeEvent& event) {
+    //printf("resize event\n");    
+    //wxSize size = panelRecord->GetBestVirtualSize();
+    //panelRecord->SetVirtualSize( size );
+    sizerRecord->FitInside(panelRecord);
+    panelRecord->Layout();
+
+    Layout();
+
+
+    int prX, prY, mX, mY;
+
+    panelRecord->GetSize(&prX, &prY);
+    panelRecord->GetVirtualSize(&mX, &mY);
+
+
+
+    printf("%04i %04i %04i %04i\n", mX, mY, prX, prY);
+}
+
 void MainWindow::OnRecordActivated(wxTreeEvent& event) {
     IRTNode *selected = irt_root.FindByItemId(event.GetItem());
+
+
     if(selected && selected->path_connected) {
           Storage &st = wxGetApp().GetStorage();
 
-          Record r = st.GetRecord(selected->full_path);
+          cur_record = st.GetRecord(selected->full_path);
 
-          r.PrintRecord();
+          cur_record.PrintRecord();
 
-          UpdateRecordPanel(r);
+          UpdateRecordPanel();
     }    
 }
 
@@ -202,41 +242,68 @@ void MainWindow::UpdateRecordTree() {
     }
 
     irt_root.AppendToTreeCtrl(recordTree);
+
+
 }
 
-void MainWindow::UpdateRecordPanel(Record &record) {
-    int i;
-    for(i=0;i<5;i++) {
+void MainWindow::UpdateRecordPanel() {
+
+    std::map<std::string, std::vector<std::string>> fields = cur_record.GetFields();
+
+
+    wxStaticText *label;
+    wxTextCtrl *entry;
+    wxButton *buttonGenerate, *buttonHide, *buttonCopy, *buttonRemove;
+
+    label=new wxStaticText(panelRecord, wxID_ANY, std::string("RID:"));
+    sizerRecord->Add(label, 0, wxALIGN_CENTER_VERTICAL|wxALIGN_RIGHT, 0);   
+    label=new wxStaticText(panelRecord, wxID_ANY, cur_record.GetId());
+    sizerRecord->Add(label,0, wxEXPAND|wxTOP|wxBOTTOM, 0);
+
+    sizerRecord->AddSpacer(0);
+    sizerRecord->AddSpacer(0);
+    sizerRecord->AddSpacer(0);
+    sizerRecord->AddSpacer(0);
+
+
+    for(auto const &cur : fields) {
         // Make Widgets
-        wxStaticText *label=new wxStaticText(panelRecord, wxID_ANY, _T("Password:"));
-        wxTextCtrl *entry=new wxTextCtrl( panelRecord, wxID_ANY, wxT(""), wxDefaultPosition, wxDefaultSize, 0);
-        wxButton *buttonGenerate=new wxButton(panelRecord, wxID_ANY, _T("G"));
-        wxButton *buttonHide=new wxButton(panelRecord, wxID_ANY, _T("H"));
-        wxButton *buttonCopy=new wxButton(panelRecord, wxID_ANY, _T("C"));
-        wxButton *buttonRemove=new wxButton(panelRecord, wxID_ANY, _T("X"));
+        label=new wxStaticText(panelRecord, wxID_ANY, cur.first+std::string(":"));
+        entry=new wxTextCtrl( panelRecord, wxID_ANY, wxT(""), wxDefaultPosition, wxDefaultSize, 0);
+        buttonGenerate=new wxButton(panelRecord, wxID_ANY, _T("G"));
+        buttonHide=new wxButton(panelRecord, wxID_ANY, _T("H"));
+        buttonCopy=new wxButton(panelRecord, wxID_ANY, _T("C"));
+        buttonRemove=new wxButton(panelRecord, wxID_ANY, _T("X"));
         
         buttonGenerate->SetMinSize(wxSize(30, 30));
         buttonHide->SetMinSize(wxSize(30, 30));
         buttonCopy->SetMinSize(wxSize(30, 30));
         buttonRemove->SetMinSize(wxSize(30, 30));
 
-        entry->SetMinSize(wxSize(300, 30));
+        //entry->SetMinSize(wxSize(300, 30));
 
         // Add to sizer
-        sizerRecord->Add(label, 0, wxEXPAND|wxTOP|wxBOTTOM, 5);   
-        sizerRecord->Add(entry,1, wxEXPAND, 0);
+        sizerRecord->Add(label, 0, wxALIGN_CENTER_VERTICAL|wxALIGN_RIGHT, 0);   
+        sizerRecord->Add(entry, 1, wxEXPAND, 0);
         sizerRecord->Add(buttonGenerate, 0, 0, 0);
         sizerRecord->Add(buttonHide, 0, 0, 0);
         sizerRecord->Add(buttonCopy, 0, 0, 0);
         sizerRecord->Add(buttonRemove, 0, 0, 0);
+
+        sizerRecord->ShowItems(true);
+
     }
-    panelRecord->SetSizer(sizerRecord);
-    panelRecord->SetScrollRate(10, 10);
+    
 
 
-    sizerRecord->Layout();
 
-    Show();
+    panelRecord->Layout();
+
+    sizerRecord->FitInside(panelRecord);
+
+    //Layout();
+
+    //Show();
 
     Refresh();
 }
