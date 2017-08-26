@@ -1,0 +1,6 @@
+[submodule "new/--reference"]
+	path = new/--reference
+	url = https://github.com/Tarsnap/scrypt.git
+[submodule "new/scrypt"]
+	path = new/scrypt
+	url = https://github.com/Tarsnap/scrypt.git

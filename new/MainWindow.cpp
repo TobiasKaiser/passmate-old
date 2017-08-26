@@ -38,6 +38,15 @@ MainWindow::MainWindow()
     wxButton *buttonSaveChanges=new wxButton(panelRight, wxID_ANY, _T("Save"));
     wxButton *buttonHistory=new wxButton(panelRight, wxID_ANY, _T("History"));
 
+    buttonAdd->Bind(wxEVT_BUTTON, &MainWindow::OnButtonAddRecord, this);
+    buttonSync->Bind(wxEVT_BUTTON, &MainWindow::OnButtonSync, this);
+    buttonRemove->Bind(wxEVT_BUTTON, &MainWindow::OnButtonRemove, this);
+    buttonRename->Bind(wxEVT_BUTTON, &MainWindow::OnButtonRename, this);
+    buttonAddField->Bind(wxEVT_BUTTON, &MainWindow::OnButtonAddField, this);
+    buttonSaveChanges->Bind(wxEVT_BUTTON, &MainWindow::OnButtonSaveChanges, this);
+    buttonHistory->Bind(wxEVT_BUTTON, &MainWindow::OnButtonHistory, this);
+
+
     // Sizing
     panelLeft->SetMinSize(wxSize(200, 200));
     panelRight->SetMinSize(wxSize(500, 200));
@@ -229,11 +238,11 @@ void MainWindow::UpdateRecordTree() {
 
     for (const string &path : st.List()) {
         vector<string> path_split = IRTNode::SplitPath(path);
-        int i;
+        
 
         IRTNode *cur = &irt_root;
 
-        for(i=0;i<path_split.size();i++) {
+        for(unsigned i=0;i<path_split.size();i++) {
             cur = cur->GetChildForceCreate(path_split[i]);
         }
 
@@ -249,6 +258,8 @@ void MainWindow::UpdateRecordTree() {
 void MainWindow::UpdateRecordPanel() {
 
     sizerRecord->Clear(true);
+
+    cur_record_text_ctrls.clear();
 
     std::map<std::string, std::vector<std::string>> fields = cur_record.GetFields();
 
@@ -288,6 +299,7 @@ void MainWindow::UpdateRecordPanel() {
             continue;
         }
 
+        cur_record_text_ctrls[cur.first] = vector<wxTextCtrl*>();
 
         label=new wxStaticText(panelRecord, wxID_ANY, cur.first+std::string(":"));
         sizerRecord->Add(label, 0, wxALIGN_CENTER_VERTICAL|wxALIGN_RIGHT, 0);   
@@ -295,9 +307,9 @@ void MainWindow::UpdateRecordPanel() {
         entry=new wxTextCtrl( panelRecord, wxID_ANY, cur.second[0], wxDefaultPosition, wxDefaultSize, 0);
         entry->SetMinSize(wxSize(30, 30));
         sizerRecord->Add(entry, 1, wxEXPAND, 0);
+        cur_record_text_ctrls[cur.first].push_back(entry);
 
-        int i;
-        for(i=1;i<cur.second.size();i++) {
+        for(unsigned i=1;i<cur.second.size();i++) {
             // with multi value fields, add the buttons in the last row
             sizerRecord->AddSpacer(0);
             sizerRecord->AddSpacer(0);
@@ -312,6 +324,7 @@ void MainWindow::UpdateRecordPanel() {
             entry=new wxTextCtrl( panelRecord, wxID_ANY, cur.second[i], wxDefaultPosition, wxDefaultSize, 0);
             entry->SetMinSize(wxSize(30, 30));
             sizerRecord->Add(entry, 1, wxEXPAND, 0);
+            cur_record_text_ctrls[cur.first].push_back(entry);
         }
 
         buttonGenerate=new wxButton(panelRecord, wxID_ANY, _T("G"));
@@ -370,4 +383,44 @@ void MainWindow::InitMenu() {
 void MainWindow::OnClose(wxCommandEvent& WXUNUSED(event)) {
     // true is to force the frame to close
     Close(true);
+}
+
+
+
+void MainWindow::OnButtonAddRecord(wxCommandEvent &evt)
+{
+    wxTextEntryDialog recordNameDialog(this, wxT("New record name:"));
+    if (recordNameDialog.ShowModal() == wxID_OK) {
+        cout << "Name:" << recordNameDialog.GetValue() << endl;
+    }
+}
+
+void MainWindow::OnButtonSync(wxCommandEvent &evt)
+{
+
+}
+
+void MainWindow::OnButtonRemove(wxCommandEvent &evt)
+{
+
+}
+
+void MainWindow::OnButtonRename(wxCommandEvent &evt)
+{
+
+}
+
+void MainWindow::OnButtonAddField(wxCommandEvent &evt)
+{
+
+}
+
+void MainWindow::OnButtonSaveChanges(wxCommandEvent &evt)
+{
+
+}
+
+void MainWindow::OnButtonHistory(wxCommandEvent &evt)
+{
+
 }

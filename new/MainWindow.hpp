@@ -46,8 +46,17 @@ class MainWindow : public wxFrame {
         IRTNode irt_root;
 
         Record cur_record;
+        std::map<std::string, std::vector<wxTextCtrl*>> cur_record_text_ctrls;
+
 
         void OnRecordActivated(wxTreeEvent& event);
+        void OnButtonAddRecord(wxCommandEvent &evt);
+        void OnButtonSync(wxCommandEvent &evt);
+        void OnButtonRemove(wxCommandEvent &evt);
+        void OnButtonRename(wxCommandEvent &evt);
+        void OnButtonAddField(wxCommandEvent &evt);
+        void OnButtonSaveChanges(wxCommandEvent &evt);
+        void OnButtonHistory(wxCommandEvent &evt);
 
     private:
         void OnClose(wxCommandEvent& event);
