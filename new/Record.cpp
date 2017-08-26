@@ -112,7 +112,8 @@ std::string Record::GetId() {
 	return record_id;
 }
 
-string Record::SetNewFieldsToStorage(Storage &dest, map<string, vector<string>> &newFields, bool dryRun) {
+// set dest = NULL to dry run
+string Record::SetNewFieldsToStorage(Storage *dest, map<string, vector<string>> &newFields) {
 	stringstream changeSummary;
 
 	map<string, vector<string>> oldFields = GetFields();
@@ -123,8 +124,8 @@ string Record::SetNewFieldsToStorage(Storage &dest, map<string, vector<string>> 
     for(auto const &curField : newFields) {
     	if(oldFields.count(curField.first) == 0) {
     		changeSummary << "New field: " << curField.first << endl;
-    		if(!dryRun) {
-    			dest.RecordSet(path, curField.first, curField.second);
+    		if(dest) {
+    			dest->RecordSet(path, curField.first, curField.second);
     		}
     	}
     }
@@ -135,8 +136,8 @@ string Record::SetNewFieldsToStorage(Storage &dest, map<string, vector<string>> 
     	if(oldFields.count(curField.first) > 0) {
     		if(oldFields[curField.first] != curField.second) {
     			changeSummary << "Changed field: " << curField.first << endl;
-    			if(!dryRun) {
-    				dest.RecordSet(path, curField.first, curField.second);
+    			if(dest) {
+    				dest->RecordSet(path, curField.first, curField.second);
     			}
     		} else {
     			//changeSummary << "Unchanged field: " << curField.first << endl;
@@ -148,8 +149,8 @@ string Record::SetNewFieldsToStorage(Storage &dest, map<string, vector<string>> 
 	for(auto const &curField : oldFields) {
 		if(newFields.count(curField.first) == 0) {
 			changeSummary << "Deleted field: " << curField.first << endl;
-			if(!dryRun) {
-				dest.RecordUnset(path, curField.first);
+			if(dest) {
+				dest->RecordUnset(path, curField.first);
 			}
 		}
 	}

@@ -37,16 +37,15 @@ MainWindow::MainWindow()
     wxButton *buttonRemove=new wxButton(panelRight, wxID_ANY, _T("Remove record"));
     wxButton *buttonRename=new wxButton(panelRight, wxID_ANY, _T("Rename record"));
     wxButton *buttonAddField=new wxButton(panelRight, wxID_ANY, _T("Add field"));
-    wxButton *buttonSaveChanges=new wxButton(panelRight, wxID_ANY, _T("Save"));
-    wxButton *buttonHistory=new wxButton(panelRight, wxID_ANY, _T("History"));
+    //wxButton *buttonHistory=new wxButton(panelRight, wxID_ANY, _T("History"));
 
     buttonAdd->Bind(wxEVT_BUTTON, &MainWindow::OnButtonAddRecord, this);
     buttonSync->Bind(wxEVT_BUTTON, &MainWindow::OnButtonSync, this);
     buttonRemove->Bind(wxEVT_BUTTON, &MainWindow::OnButtonRemove, this);
     buttonRename->Bind(wxEVT_BUTTON, &MainWindow::OnButtonRename, this);
     buttonAddField->Bind(wxEVT_BUTTON, &MainWindow::OnButtonAddField, this);
-    buttonSaveChanges->Bind(wxEVT_BUTTON, &MainWindow::OnButtonSaveChanges, this);
-    buttonHistory->Bind(wxEVT_BUTTON, &MainWindow::OnButtonHistory, this);
+
+    //buttonHistory->Bind(wxEVT_BUTTON, &MainWindow::OnButtonHistory, this);
 
 
     // Sizing
@@ -72,16 +71,33 @@ MainWindow::MainWindow()
     sizerLeft->Add(buttonSync,0, wxEXPAND, 0);
     panelLeft->SetSizer(sizerLeft);
 
+
+
     //sizerLeft->SetSizeHints(panelLeft);
+
+    wxPanel *commitChangeBar = new wxPanel(panelRight);
+
+
+    commitChangeBar->SetBackgroundColour(wxColour(* wxRED));
+    
+    wxButton *buttonSaveChanges=new wxButton(commitChangeBar, wxID_ANY, _T("Save"));
+
+    buttonSaveChanges->Bind(wxEVT_BUTTON, &MainWindow::OnButtonSaveChanges, this);
+
+    wxBoxSizer *commitChangeBarSizer = new wxBoxSizer(wxHORIZONTAL);
+    commitChangeBarSizer->Add(new wxStaticText(commitChangeBar, wxID_ANY, _T("This record has been changed.")), 1, wxALIGN_CENTER,0); 
+    commitChangeBarSizer->Add(buttonSaveChanges,0, 0,0);
+    commitChangeBar->SetSizer(commitChangeBarSizer);
+
 
     wxBoxSizer *sizerButtonsRight = new wxBoxSizer(wxHORIZONTAL);
     sizerButtonsRight->Add(buttonRename,1, wxEXPAND|wxRIGHT,5);
     sizerButtonsRight->Add(buttonRemove,1, wxEXPAND|wxRIGHT,5);
-    sizerButtonsRight->Add(buttonHistory,1, wxEXPAND|wxRIGHT,5);
+    //sizerButtonsRight->Add(buttonHistory,1, wxEXPAND|wxRIGHT,5);
     sizerButtonsRight->Add(buttonAddField,1, wxEXPAND|wxRIGHT,5);
-    sizerButtonsRight->Add(buttonSaveChanges,1, wxEXPAND,0);
-
+    
     wxBoxSizer *sizerRight=new wxBoxSizer(wxVERTICAL);
+    sizerRight->Add(commitChangeBar,0,wxLEFT|wxRIGHT|wxTOP|wxEXPAND,2);
     sizerRight->Add(panelRecord,1,wxALL|wxEXPAND,2);
     sizerRight->Add(sizerButtonsRight,0,wxLEFT|wxRIGHT|wxBOTTOM|wxEXPAND,2);
     panelRight->SetSizer(sizerRight);
@@ -97,7 +113,6 @@ MainWindow::MainWindow()
 
     
     UpdateRecordPanel();
-
 
     panelRecord->SetSizer(sizerRecord);
     panelRecord->SetScrollRate(0, 10);
@@ -482,12 +497,12 @@ void MainWindow::OnButtonSaveChanges(wxCommandEvent &evt)
 
     std::map<std::string, std::vector<std::string>> guiRecord = GetGUIRecord();
 
-    string proposedChanges = cur_record.SetNewFieldsToStorage(st, guiRecord, false);
+    string proposedChanges = cur_record.SetNewFieldsToStorage(NULL, guiRecord);
 
     wxMessageDialog confirmationDialog(this, wxString("Do you want to apply the following changes?\n" + proposedChanges), wxT("Save changes"), wxYES|wxNO|wxCENTRE);
 
     if (confirmationDialog.ShowModal() == wxID_YES) {
-        cur_record.SetNewFieldsToStorage(st, guiRecord, false);
+        cur_record.SetNewFieldsToStorage(&st, guiRecord);
         st.Save();
     }    
 }
