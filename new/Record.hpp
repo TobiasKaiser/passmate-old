@@ -12,10 +12,12 @@ class Record {
 		Record(std::string record_id);
 		Record(const Record &obj) {
 			record_id = obj.record_id;
+			valid = obj.valid;
 			values = obj.values;
 		}
-		Record() { record_id = "INVALID"; } // This is somehow necessary for the map to work -,-
+		Record();
 
+		bool IsValid();
 
 		// UpdateByVect is called by the Strorage class to populate the records.
 		void UpdateByVect(std::string vect_name, long long vect_timestamp, std::vector<std::string> vect_value);
@@ -37,5 +39,7 @@ class Record {
 		std::map<std::string, std::pair<long long,std::vector<std::string>>> values;
 
 		std::string record_id;
+
+		bool valid;
 
 };

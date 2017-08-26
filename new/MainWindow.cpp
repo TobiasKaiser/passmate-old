@@ -8,7 +8,7 @@
 
 #include <wx/splitter.h>
 #include <wx/sizer.h>
-
+#include <wx/clipbrd.h>
 #include <wx/textctrl.h>
 
 using namespace std;
@@ -16,18 +16,20 @@ using namespace std;
 MainWindow::MainWindow()
     : wxFrame(NULL, wxID_ANY, wxT("Passmate"), wxDefaultPosition, wxSize(0, 0))
     , irt_root(NULL, "")
+    , cur_record()
 {
     
     // Panels
     wxSplitterWindow *splittermain = new wxSplitterWindow(this,wxID_ANY,wxDefaultPosition,wxDefaultSize,wxSP_3D);
     wxPanel *panelLeft=new wxPanel(splittermain,wxID_ANY,wxDefaultPosition,wxDefaultSize,wxTAB_TRAVERSAL|wxNO_BORDER);
-    wxPanel *panelRight=new wxPanel(splittermain,wxID_ANY,wxDefaultPosition,wxDefaultSize,wxTAB_TRAVERSAL|wxNO_BORDER);
+    panelRight=new wxPanel(splittermain,wxID_ANY,wxDefaultPosition,wxDefaultSize,wxTAB_TRAVERSAL|wxNO_BORDER);
     splittermain->SplitVertically(panelLeft, panelRight);
     panelRecord=new wxScrolledWindow(panelRight,wxID_ANY,wxDefaultPosition,wxDefaultSize, wxVSCROLL|wxBORDER_SUNKEN);
 
 
     // Widgets
     wxTextCtrl *entryFilter=new wxTextCtrl( panelLeft, wxID_ANY, wxT(""), wxDefaultPosition, wxDefaultSize, 0);
+    entryFilter->Bind(wxEVT_TEXT, &MainWindow::OnFilterUpdated, this);
 
     recordTree=new wxTreeCtrl(panelLeft, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTR_DEFAULT_STYLE/*|wxTR_HIDE_ROOT*/);
 
@@ -75,7 +77,7 @@ MainWindow::MainWindow()
 
     //sizerLeft->SetSizeHints(panelLeft);
 
-    wxPanel *commitChangeBar = new wxPanel(panelRight);
+    commitChangeBar = new wxPanel(panelRight);
 
 
     commitChangeBar->SetBackgroundColour(wxColour(* wxRED));
@@ -111,6 +113,8 @@ MainWindow::MainWindow()
     sizerRecord=new wxFlexGridSizer(6, 5, 5); // 6 cols, 5 pixel horizontal and vertical padding
     sizerRecord->AddGrowableCol(1);
 
+
+    ShowCommitBar(false);
     
     UpdateRecordPanel();
 
@@ -135,14 +139,8 @@ MainWindow::MainWindow()
     //panelRecord->ShowScrollbars(wxSHOW_SB_ALWAYS, wxSHOW_SB_ALWAYS);
 }
 
-/*
-void MainWindow::OnFilterUpdate() {
-
-}
-*/
-
 void MainWindow::OnSize(wxSizeEvent& event) {
-    //printf("resize event\n");    
+    /*//printf("resize event\n");    
     //wxSize size = panelRecord->GetBestVirtualSize();
     //panelRecord->SetVirtualSize( size );
     sizerRecord->FitInside(panelRecord);
@@ -159,6 +157,8 @@ void MainWindow::OnSize(wxSizeEvent& event) {
 
 
     printf("%04i %04i %04i %04i\n", mX, mY, prX, prY);
+    */
+    Layout();
 }
 
 void MainWindow::OnRecordActivated(wxTreeEvent& event) {
@@ -169,8 +169,7 @@ void MainWindow::OnRecordActivated(wxTreeEvent& event) {
           Storage &st = wxGetApp().GetStorage();
 
           cur_record = st.GetRecord(selected->full_path);
-
-          cur_record.PrintRecord();
+          ShowCommitBar(false);
 
           UpdateRecordPanel();
     }    
@@ -242,8 +241,69 @@ void MainWindow::IRTNode::AppendToTreeCtrl(wxTreeCtrl *tree) {
     }
 }
 
+void MainWindow::OnFieldGenerate(wxCommandEvent &evt)
+{
+    FieldButtonUserData *ud = (FieldButtonUserData *) evt.GetEventUserData();
+    cout << "Field generate " << ud->GetFieldName() << ", " << ud->GetValueIdx() << endl;
 
-void MainWindow::UpdateRecordTree() {
+}
+
+void MainWindow::OnFieldMaskUnmask(wxCommandEvent &evt)
+{
+    FieldButtonUserData *ud = (FieldButtonUserData *) evt.GetEventUserData();
+    cout << "Field mask unmask " << ud->GetFieldName() << ", " << ud->GetValueIdx() << endl;
+
+
+    wxTextCtrl *entry = cur_record_text_ctrls[ud->GetFieldName()][ud->GetValueIdx()];
+
+
+    long flags = entry->GetWindowStyleFlag();
+    if ((flags & wxTE_PASSWORD)) {
+        // password is masked, so unmask it now
+        entry->SetWindowStyleFlag(flags & ~wxTE_PASSWORD);
+    } else {
+        // password is unmasked, so mask it now
+        entry->SetWindowStyleFlag(flags | wxTE_PASSWORD);
+    }
+
+    entry->Refresh();
+    
+}
+
+void MainWindow::OnFieldClip(wxCommandEvent &evt)
+{
+    FieldButtonUserData *ud = (FieldButtonUserData *) evt.GetEventUserData();
+    cout << "Field clip " << ud->GetFieldName() << ", " << ud->GetValueIdx() << endl;
+
+    wxTextCtrl *entry = cur_record_text_ctrls[ud->GetFieldName()][ud->GetValueIdx()];
+
+    //wxClipboard clipboard = wxClipboard();
+    if(wxTheClipboard->Open()) {
+        //clipboard.Clear();
+        wxTheClipboard->SetData( new wxTextDataObject( entry->GetValue() ) );
+        wxTheClipboard->Flush();
+        wxTheClipboard->Close();      
+    }
+}
+
+void MainWindow::OnFieldRemove(wxCommandEvent &evt)
+{
+    FieldButtonUserData *ud = (FieldButtonUserData *) evt.GetEventUserData();
+    cout << "Field remove " << ud->GetFieldName() << ", " << ud->GetValueIdx() << endl;
+
+    vector<wxTextCtrl *> allValueEntries = cur_record_text_ctrls[ud->GetFieldName()];
+
+    for(const auto &entry : allValueEntries) {
+        entry->Enable(false);
+        entry->ChangeValue(wxT("")); // in contrast to SetValue, this does not make a event.
+    }
+
+    ShowCommitBar(true);
+
+}
+
+void MainWindow::UpdateRecordTree()
+{
     Storage &st = wxGetApp().GetStorage();
 
     recordTree->DeleteAllItems();
@@ -283,35 +343,39 @@ void MainWindow::UpdateRecordPanel() {
     wxStaticText *label;
 
 
-    // Path
-    label=new wxStaticText(panelRecord, wxID_ANY, std::string("Path:"));
-    sizerRecord->Add(label, 0, wxALIGN_CENTER_VERTICAL|wxALIGN_RIGHT, 0);   
-    label=new wxStaticText(panelRecord, wxID_ANY, cur_record.GetPath());
-    sizerRecord->Add(label,0, wxEXPAND|wxTOP|wxBOTTOM, 0);
+    if(cur_record.IsValid()) {
 
-    sizerRecord->AddSpacer(0);
-    sizerRecord->AddSpacer(0);
-    sizerRecord->AddSpacer(0);
-    sizerRecord->AddSpacer(0);
+        // Path
+        label=new wxStaticText(panelRecord, wxID_ANY, std::string("Path:"));
+        sizerRecord->Add(label, 0, wxALIGN_CENTER_VERTICAL|wxALIGN_RIGHT, 0);   
+        label=new wxStaticText(panelRecord, wxID_ANY, cur_record.GetPath());
+        sizerRecord->Add(label,0, wxEXPAND|wxTOP|wxBOTTOM, 0);
 
+        sizerRecord->AddSpacer(0);
+        sizerRecord->AddSpacer(0);
+        sizerRecord->AddSpacer(0);
+        sizerRecord->AddSpacer(0);
 
-    // RID
-    label=new wxStaticText(panelRecord, wxID_ANY, std::string("RID:"));
-    sizerRecord->Add(label, 0, wxALIGN_CENTER_VERTICAL|wxALIGN_RIGHT, 0);   
-    label=new wxStaticText(panelRecord, wxID_ANY, cur_record.GetId());
-    sizerRecord->Add(label,0, wxEXPAND|wxTOP|wxBOTTOM, 0);
+        const bool showRID = false;
 
-    sizerRecord->AddSpacer(0);
-    sizerRecord->AddSpacer(0);
-    sizerRecord->AddSpacer(0);
-    sizerRecord->AddSpacer(0);
+        if(showRID) {
+            // RID
+            label=new wxStaticText(panelRecord, wxID_ANY, std::string("RID:"));
+            sizerRecord->Add(label, 0, wxALIGN_CENTER_VERTICAL|wxALIGN_RIGHT, 0);   
+            label=new wxStaticText(panelRecord, wxID_ANY, cur_record.GetId());
+            sizerRecord->Add(label,0, wxEXPAND|wxTOP|wxBOTTOM, 0);
 
+            sizerRecord->AddSpacer(0);
+            sizerRecord->AddSpacer(0);
+            sizerRecord->AddSpacer(0);
+            sizerRecord->AddSpacer(0);
+        }
 
-    for(auto const &cur : fields) {
-        addFieldToPanel(cur.first, cur.second);
+        for(auto const &cur : fields) {
+            addFieldToPanel(cur.first, cur.second);
 
-    }
-    
+        }
+    }        
 
 
     sizerRecord->ShowItems(true);
@@ -322,7 +386,7 @@ void MainWindow::UpdateRecordPanel() {
 }
 
 bool MainWindow::isPasswordField(std::string key) {
-    regex passwordRegex("^password");
+    regex passwordRegex("^password.*");
     return regex_match(key, passwordRegex);
 }
 
@@ -343,43 +407,55 @@ void MainWindow::addFieldToPanel(std::string key, std::vector<std::string> value
     label=new wxStaticText(panelRecord, wxID_ANY, key+std::string(":"));
     sizerRecord->Add(label, 0, wxALIGN_CENTER_VERTICAL|wxALIGN_RIGHT, 0);   
 
-    for(unsigned i=0;i<values.size();i++) {
+    unsigned i = 0;
+
+    for(i=0;i<values.size();i++) {
         if(i > 0) {
-            // with multi value fields, add the buttons in the last row
-            sizerRecord->AddSpacer(0);
-            sizerRecord->AddSpacer(0);
-            sizerRecord->AddSpacer(0);
-            sizerRecord->AddSpacer(0);
-
-
             // do not repeat the label in the next line
             sizerRecord->AddSpacer(0);
         }
+
         // and the second value :)
         entry=new wxTextCtrl( panelRecord, wxID_ANY, values[i], wxDefaultPosition, wxDefaultSize, 0);
         entry->SetMinSize(wxSize(30, 30));
+        entry->Bind(wxEVT_TEXT, &MainWindow::OnRecordFieldTextEvent, this);
         sizerRecord->Add(entry, 1, wxEXPAND, 0);
         cur_record_text_ctrls[key].push_back(entry);
-    }
+    
+    
+        if(isPasswordField(key)) {    
+            
+            entry->SetWindowStyleFlag(entry->GetWindowStyleFlag() | wxTE_PASSWORD);
 
-    if(isPasswordField(key)) {    
-        buttonGenerate=new wxButton(panelRecord, wxID_ANY, _T("G"));
-        buttonHide=new wxButton(panelRecord, wxID_ANY, _T("S"));
-        buttonGenerate->SetMinSize(wxSize(30, 30));
-        buttonHide->SetMinSize(wxSize(30, 30));
-        sizerRecord->Add(buttonGenerate, 0, 0, 0);
-        sizerRecord->Add(buttonHide, 0, 0, 0);
-    } else {
-        sizerRecord->AddSpacer(0);
-        sizerRecord->AddSpacer(0);
-    }
+            buttonGenerate=new wxButton(panelRecord, wxID_ANY, _T("G"));
+            buttonGenerate->Bind(wxEVT_BUTTON, &MainWindow::OnFieldGenerate, this, wxID_ANY, wxID_ANY, new FieldButtonUserData(key, i));
+            buttonGenerate->SetMinSize(wxSize(30, 30));
+            sizerRecord->Add(buttonGenerate, 0, 0, 0);
 
-    buttonCopy=new wxButton(panelRecord, wxID_ANY, _T("C"));
-    buttonRemove=new wxButton(panelRecord, wxID_ANY, _T("X"));
-    buttonCopy->SetMinSize(wxSize(30, 30));
-    buttonRemove->SetMinSize(wxSize(30, 30));
-    sizerRecord->Add(buttonCopy, 0, 0, 0);
-    sizerRecord->Add(buttonRemove, 0, 0, 0);
+            buttonHide=new wxButton(panelRecord, wxID_ANY, _T("S"));
+            buttonHide->Bind(wxEVT_BUTTON, &MainWindow::OnFieldMaskUnmask, this, wxID_ANY, wxID_ANY, new FieldButtonUserData(key, i));
+            buttonHide->SetMinSize(wxSize(30, 30));
+            sizerRecord->Add(buttonHide, 0, 0, 0);
+        } else {
+            sizerRecord->AddSpacer(0);
+            sizerRecord->AddSpacer(0);
+        }
+
+        buttonCopy=new wxButton(panelRecord, wxID_ANY, _T("C"));
+        buttonCopy->Bind(wxEVT_BUTTON, &MainWindow::OnFieldClip, this, wxID_ANY, wxID_ANY, new FieldButtonUserData(key, i));
+        buttonCopy->SetMinSize(wxSize(30, 30));
+        sizerRecord->Add(buttonCopy, 0, 0, 0);
+
+        if(i==values.size()-1) {
+            // remove button comes only once per field
+            buttonRemove=new wxButton(panelRecord, wxID_ANY, _T("X"));   
+            buttonRemove->Bind(wxEVT_BUTTON, &MainWindow::OnFieldRemove, this, wxID_ANY, wxID_ANY, new FieldButtonUserData(key, i));
+            buttonRemove->SetMinSize(wxSize(30, 30));
+            sizerRecord->Add(buttonRemove, 0, 0, 0);
+        } else {
+            sizerRecord->AddSpacer(0);
+        }
+    }
 }
 
 void MainWindow::InitMenu() {
@@ -435,16 +511,86 @@ void MainWindow::OnButtonSync(wxCommandEvent &evt)
 
 void MainWindow::OnButtonRemove(wxCommandEvent &evt)
 {
+    if(!cur_record.IsValid()) {
+        cout << "x" << endl;
+        return;
 
+    }
+
+    Storage &st = wxGetApp().GetStorage();
+
+    wxMessageDialog confirmationDialog(this, wxString("Do you want to remove record "+ cur_record.GetPath()+"?"), wxT("Remove record"), wxYES|wxNO|wxCENTRE);
+
+    if (confirmationDialog.ShowModal() == wxID_YES) {
+        string path = cur_record.GetPath();
+        st.DeleteRecord(path);
+        st.Save();
+    }
+
+
+    cur_record = Record();
+
+    UpdateRecordTree();
+    UpdateRecordPanel();
+
+
+    
+}
+
+void MainWindow::ShowCommitBar(bool enable) {
+    changesPending=enable;
+    if(enable) {
+        commitChangeBar->Show();
+    } else {
+        commitChangeBar->Hide();
+    }
+    panelRight->Layout();
+
+    //Refresh();
 }
 
 void MainWindow::OnButtonRename(wxCommandEvent &evt)
 {
+    if(!cur_record.IsValid()) {
+        cout << "x" << endl;
+        return;
+    }
 
+    if(changesPending) {
+        wxMessageDialog msgBox(this, wxString("Please save record before renaming."), wxT("Rename"), wxOK|wxCENTRE);
+
+        msgBox.ShowModal();
+
+        return;
+    }
+
+    Storage &st = wxGetApp().GetStorage();
+
+    wxTextEntryDialog recordNameDialog(this, wxT("New record name:"));
+    
+    recordNameDialog.SetValue(wxString(cur_record.GetPath()));
+
+    if(recordNameDialog.ShowModal() == wxID_OK) {
+        st.MoveRecord(string(recordNameDialog.GetValue()), cur_record.GetPath());
+        st.Save();
+
+        cur_record = st.GetRecord(string(recordNameDialog.GetValue()));
+
+
+        UpdateRecordTree();
+
+        UpdateRecordPanel();
+
+    }
+    
 }
 
 void MainWindow::OnButtonAddField(wxCommandEvent &evt)
 {
+    if(!cur_record.IsValid()) {
+        return;
+    }
+
     wxTextEntryDialog fieldNameDialog(this, wxT("New field name:"));
     wxTextEntryDialog valueCountDialog(this, wxT("Number of values:"));
     valueCountDialog.SetValue("1");
@@ -465,6 +611,9 @@ void MainWindow::OnButtonAddField(wxCommandEvent &evt)
                     sizerRecord->ShowItems(true);
                     panelRecord->Layout();
                     sizerRecord->FitInside(panelRecord);
+                    
+                    ShowCommitBar(true);
+
                     Refresh();  
 
                     break;
@@ -482,6 +631,9 @@ std::map<std::string, std::vector<std::string>>  MainWindow::GetGUIRecord()
 {
     std::map<std::string, std::vector<std::string>> ret;
     for(auto const &curField : cur_record_text_ctrls) {
+        if(!curField.second[0]->IsThisEnabled()) {
+            continue; // the field has been removed and is now grayed out until we press save.
+        }
         ret[curField.first] = vector<string>();
         for(auto const &curValue : curField.second) {
              ret[curField.first].push_back(string(curValue->GetValue()));
@@ -504,10 +656,28 @@ void MainWindow::OnButtonSaveChanges(wxCommandEvent &evt)
     if (confirmationDialog.ShowModal() == wxID_YES) {
         cur_record.SetNewFieldsToStorage(&st, guiRecord);
         st.Save();
+
+        cur_record = st.GetRecord(cur_record.GetPath());
+        UpdateRecordPanel();
+
+        ShowCommitBar(false);
+
     }    
 }
 
 void MainWindow::OnButtonHistory(wxCommandEvent &evt)
 {
 
+}
+
+void MainWindow::OnRecordFieldTextEvent(wxCommandEvent &evt)
+{
+    ShowCommitBar(true);
+}
+
+void MainWindow::OnFilterUpdated(wxCommandEvent &evt)
+{
+    cout << "Filter updated!" << endl;
+
+    // Todo
 }

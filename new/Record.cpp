@@ -30,6 +30,11 @@ void Record::UpdateByVect(std::string vect_name, long long vect_timestamp, std::
 	}
 }
 
+bool Record::IsValid()
+{
+	return valid;
+}
+
 std::map<std::string, std::vector<std::string>> Record::GetFields() {
 
 	map<string, vector<string>> ret;
@@ -57,6 +62,19 @@ std::map<std::string, std::vector<std::string>> Record::GetFields() {
 		ret[field_name_shortened] = field_value;
 	}
 
+	// empty fields have to be removed, else they cause problems later.
+	
+	map<string, vector<string>>::iterator iter = ret.begin();
+	while (iter != ret.end()) {
+		
+		if (iter->second.size()==0) {
+			ret.erase(iter++);  // alternatively, i = items.erase(i);
+		} else {
+			++iter;
+		}
+	}
+	
+
 	return ret;
 }
 
@@ -78,9 +96,14 @@ void Record::PrintRecord() {
 	}
 }
 
+Record::Record() {
+	this->record_id = "INVALID";
+	valid = false;
+}
 
 Record::Record(std::string record_id) {
 	this->record_id = record_id;
+	valid = true;
 }
 
 bool Record::IsHidden() {

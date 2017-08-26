@@ -447,14 +447,8 @@ void Storage::RecordSet(string const &path, string const &key, vector<string> co
 }
 
 void Storage::RecordUnset(string const &path, string const &key) {
-
+	RecordSetRaw(path, "_" + key, vector<string>());
 }
-
-/*	
-	def record_unset(self, path, key):
-		self.record_set(path, key, [])
-*/
-
 
 
 Storage::Exception::Exception(Storage::Exception::Err errCode) throw()

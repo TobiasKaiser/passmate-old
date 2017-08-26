@@ -19,9 +19,29 @@ class MainWindow : public wxFrame {
         wxScrolledWindow *panelRecord;
         wxFlexGridSizer *sizerRecord;
         wxTreeCtrl *recordTree;
+        wxPanel *commitChangeBar;
+
+        bool changesPending;
+
         void UpdateRecordPanel();
         void UpdateRecordTree();
 
+
+        class FieldButtonUserData : public wxObject {
+            // FieldButtonUserData is basically just a pair<string,int>, but manageable by wx memory management, thus usable as user data for button events.
+            public:
+                FieldButtonUserData(std::string field_name, int value_idx) {
+                    this->field_name = field_name;
+                    this->value_idx = value_idx;
+                }
+
+                std::string GetFieldName() { return field_name; }
+                int GetValueIdx() { return value_idx; }
+            private:
+                int value_idx;
+                std::string field_name;
+
+        };
 
         // Intermediate Record Tree Node: This is responsible for turning the flat record structure into a tree structure based on "/" as a delimiter.
         class IRTNode {
@@ -48,8 +68,11 @@ class MainWindow : public wxFrame {
         Record cur_record;
         std::map<std::string, std::vector<wxTextCtrl*>> cur_record_text_ctrls;
 
+        wxPanel *panelRight;
 
         std::map<std::string, std::vector<std::string>> GetGUIRecord();
+
+        void ShowCommitBar(bool enable);
 
         void OnRecordActivated(wxTreeEvent& event);
         void OnButtonAddRecord(wxCommandEvent &evt);
@@ -59,13 +82,22 @@ class MainWindow : public wxFrame {
         void OnButtonAddField(wxCommandEvent &evt);
         void OnButtonSaveChanges(wxCommandEvent &evt);
         void OnButtonHistory(wxCommandEvent &evt);
-
-    private:
+        void OnRecordFieldTextEvent(wxCommandEvent &evt);
         void OnClose(wxCommandEvent& event);
         void OnSize(wxSizeEvent& event);
+        void OnFilterUpdated(wxCommandEvent &evt);
+
+        void OnFieldGenerate(wxCommandEvent &evt);
+        void OnFieldMaskUnmask(wxCommandEvent &evt);
+        void OnFieldClip(wxCommandEvent &evt);
+        void OnFieldRemove(wxCommandEvent &evt);
+
 
         void addFieldToPanel(std::string key, std::vector<std::string> values);
 
         bool isPasswordField(std::string key);
+  
+    private:
+  
 
 };
