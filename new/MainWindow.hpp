@@ -50,18 +50,24 @@ class MainWindow : public wxFrame {
                 IRTNode *GetChildForceCreate(std::string new_node_name);
                 void AppendToTreeCtrl(wxTreeCtrl *tree);
                 MainWindow::IRTNode *FindByItemId(const wxTreeItemId &search_id);
+                MainWindow::IRTNode *FindByPath(const std::string &path);
 
+                bool ExpandTreeTo(wxTreeCtrl *recordTree, IRTNode *dest);
+                MainWindow::IRTNode *FindFirstFiltered(std::string search);
+                bool ApplyFilter(std::string search);
 
                 static std::vector<std::string> SplitPath(std::string path);
 
                 std::string node_name;
                 std::string full_path;
-                bool search_flag;
+                bool filter_flag;
                 std::list<IRTNode> children;
                 wxTreeItemId item_id;
                 IRTNode *parent;
                 bool path_connected;
         };
+
+        std::string prevSearchString;
 
         IRTNode irt_root;
 
@@ -69,8 +75,12 @@ class MainWindow : public wxFrame {
         std::map<std::string, std::vector<wxTextCtrl*>> cur_record_text_ctrls;
 
         wxPanel *panelRight;
+        wxTextCtrl *entryFilter;
 
         std::map<std::string, std::vector<std::string>> GetGUIRecord();
+
+        void SwitchToRecord(std::string path);
+        void SwitchToNoRecord();
 
         void ShowCommitBar(bool enable);
 
@@ -86,6 +96,7 @@ class MainWindow : public wxFrame {
         void OnClose(wxCommandEvent& event);
         void OnSize(wxSizeEvent& event);
         void OnFilterUpdated(wxCommandEvent &evt);
+        void OnFilterApply(wxCommandEvent &evt);
 
         void OnFieldGenerate(wxCommandEvent &evt);
         void OnFieldMaskUnmask(wxCommandEvent &evt);

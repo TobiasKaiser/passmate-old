@@ -10,6 +10,7 @@
 #include <wx/sizer.h>
 #include <wx/clipbrd.h>
 #include <wx/textctrl.h>
+#include <wx/artprov.h>
 
 using namespace std;
 
@@ -28,17 +29,26 @@ MainWindow::MainWindow()
 
 
     // Widgets
-    wxTextCtrl *entryFilter=new wxTextCtrl( panelLeft, wxID_ANY, wxT(""), wxDefaultPosition, wxDefaultSize, 0);
+    entryFilter=new wxTextCtrl( panelLeft, wxID_ANY, wxT(""), wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
     entryFilter->Bind(wxEVT_TEXT, &MainWindow::OnFilterUpdated, this);
+    entryFilter->Bind(wxEVT_TEXT_ENTER, &MainWindow::OnFilterApply, this);
 
     recordTree=new wxTreeCtrl(panelLeft, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTR_DEFAULT_STYLE/*|wxTR_HIDE_ROOT*/);
 
     wxButton *buttonAdd=new wxButton(panelLeft, wxID_ANY, _T("Add record"));
+    buttonAdd->SetBitmap(wxArtProvider::GetBitmap(wxART_PLUS));
     wxButton *buttonSync=new wxButton(panelLeft, wxID_ANY, _T("Sync database"));
+    buttonSync->SetBitmap(wxArtProvider::GetBitmap("gtk-network", wxART_MENU));
+
 
     wxButton *buttonRemove=new wxButton(panelRight, wxID_ANY, _T("Remove record"));
+    buttonRemove->SetBitmap(wxArtProvider::GetBitmap(wxART_DELETE));
     wxButton *buttonRename=new wxButton(panelRight, wxID_ANY, _T("Rename record"));
+    buttonRename->SetBitmap(wxArtProvider::GetBitmap("gtk-edit", wxART_MENU));
+    
     wxButton *buttonAddField=new wxButton(panelRight, wxID_ANY, _T("Add field"));
+    buttonAddField->SetBitmap(wxArtProvider::GetBitmap(wxART_PLUS));
+    
     //wxButton *buttonHistory=new wxButton(panelRight, wxID_ANY, _T("History"));
 
     buttonAdd->Bind(wxEVT_BUTTON, &MainWindow::OnButtonAddRecord, this);
@@ -83,7 +93,8 @@ MainWindow::MainWindow()
     commitChangeBar->SetBackgroundColour(wxColour(* wxRED));
     
     wxButton *buttonSaveChanges=new wxButton(commitChangeBar, wxID_ANY, _T("Save"));
-
+    buttonSaveChanges->SetBitmap(wxArtProvider::GetBitmap(wxART_FILE_SAVE));
+    
     buttonSaveChanges->Bind(wxEVT_BUTTON, &MainWindow::OnButtonSaveChanges, this);
 
     wxBoxSizer *commitChangeBarSizer = new wxBoxSizer(wxHORIZONTAL);
@@ -161,17 +172,33 @@ void MainWindow::OnSize(wxSizeEvent& event) {
     Layout();
 }
 
+
+void MainWindow::SwitchToRecord(std::string path)
+{
+    // TODO: Ask for confirmation if there are changes to the current record here.
+
+    Storage &st = wxGetApp().GetStorage();
+
+    cur_record = st.GetRecord(path);
+    ShowCommitBar(false);
+
+    UpdateRecordPanel();
+}
+
+void MainWindow::SwitchToNoRecord(void)
+{
+    cur_record = Record();
+    
+    ShowCommitBar(false);
+
+    UpdateRecordPanel();   
+}
+
 void MainWindow::OnRecordActivated(wxTreeEvent& event) {
     IRTNode *selected = irt_root.FindByItemId(event.GetItem());
 
-
     if(selected && selected->path_connected) {
-          Storage &st = wxGetApp().GetStorage();
-
-          cur_record = st.GetRecord(selected->full_path);
-          ShowCommitBar(false);
-
-          UpdateRecordPanel();
+        SwitchToRecord(selected->full_path);
     }    
 }
 
@@ -183,7 +210,7 @@ MainWindow::IRTNode::IRTNode(IRTNode *parent, std::string node_name) {
     full_path="";
     path_connected = false;
 
-    search_flag = true;
+    filter_flag = true;
 }
 
 MainWindow::IRTNode *MainWindow::IRTNode::GetChildForceCreate(std::string new_node_name) {
@@ -214,6 +241,22 @@ std::vector<std::string> MainWindow::IRTNode::SplitPath(std::string path) {
     return ret;
 }
 
+MainWindow::IRTNode *MainWindow::IRTNode::FindByPath(const std::string &path) {
+    if(full_path == path)
+        return this;
+
+    for(IRTNode &child : children) {
+        IRTNode *result;
+        result = child.FindByPath(path);
+
+        if(result)
+            return result;
+    }
+
+    return NULL;
+}
+
+
 MainWindow::IRTNode *MainWindow::IRTNode::FindByItemId(const wxTreeItemId &search_id){
     if(item_id == search_id)
         return this;
@@ -229,7 +272,11 @@ MainWindow::IRTNode *MainWindow::IRTNode::FindByItemId(const wxTreeItemId &searc
     return NULL;
 }
 
+
 void MainWindow::IRTNode::AppendToTreeCtrl(wxTreeCtrl *tree) {
+    if(!filter_flag)
+        return;
+
     if(parent) {
         item_id = tree->AppendItem(parent->item_id, node_name);
     } else {
@@ -302,15 +349,78 @@ void MainWindow::OnFieldRemove(wxCommandEvent &evt)
 
 }
 
+
+bool MainWindow::IRTNode::ApplyFilter(std::string search)
+{
+    filter_flag = false;
+
+
+    for(IRTNode &child : children) {
+        if(child.ApplyFilter(search))
+            filter_flag = true;
+    }
+
+    if(!filter_flag && (full_path.find(search) != string::npos)) {
+        filter_flag = true;
+    }
+
+    return filter_flag;
+}
+
+MainWindow::IRTNode *MainWindow::IRTNode::FindFirstFiltered(std::string search)
+{
+    if(filter_flag && path_connected) {
+        return this;
+    }
+
+    for(IRTNode &child : children) {
+        IRTNode *ret;
+        ret = child.FindFirstFiltered(search);
+        if(ret) {
+            return ret;
+        }
+    }
+    return NULL;
+}
+
+bool MainWindow::IRTNode::ExpandTreeTo(wxTreeCtrl *recordTree, IRTNode *dest)
+{
+    if(dest == this) {
+        if(item_id)
+            recordTree->Expand(item_id);
+        return true;
+    }
+
+    for(IRTNode &child : children) {
+        if(child.ExpandTreeTo(recordTree, dest)) {
+            if(item_id)
+                recordTree->Expand(item_id);
+            return true;
+        }
+    }
+
+    return false;
+}
+
 void MainWindow::UpdateRecordTree()
 {
+    bool selected_before;
+    string selected_before_path;
+    IRTNode *selected_before_node = irt_root.FindByItemId(recordTree->GetSelection());
+    if(selected_before_node && selected_before_node != &irt_root) {
+        selected_before = true;
+        selected_before_path = selected_before_node->full_path;
+    } else {
+        selected_before = false;
+        selected_before_node = NULL;
+    }
+
+
     Storage &st = wxGetApp().GetStorage();
 
     recordTree->DeleteAllItems();
 
-    //wxTreeItemId root_id=recordTree->AddRoot("passmate db");
-
-    //IRTNode irt_root(NULL, "passmate db");
+ 
     irt_root = IRTNode(NULL, "passmate db");
 
     for (const string &path : st.List()) {
@@ -327,9 +437,53 @@ void MainWindow::UpdateRecordTree()
         cur->path_connected = true;
     }
 
+    string searchString = string(entryFilter->GetValue());
+
+    if(searchString.length()>0) {
+        irt_root.ApplyFilter(searchString);    
+    }
+    
     irt_root.AppendToTreeCtrl(recordTree);
 
+    IRTNode *selected_after = NULL;
+    if(selected_before) {
+        selected_after = irt_root.FindByPath(selected_before_path);
+    }
 
+    IRTNode *select_me = NULL;
+
+    if(selected_before && selected_after && selected_after->item_id) {
+        cout << "y" << endl;
+        
+        select_me = selected_after;
+    } else if(searchString.length() > 0) {
+        cout << "z" << endl;
+        
+        // on empty search string, select nothing, unless there was a selection before.
+        select_me = irt_root.FindFirstFiltered(searchString);
+    }
+
+    if(prevSearchString.length() > 0 && searchString.length()==0) {
+        select_me = NULL;
+    }
+
+
+
+    if(select_me && select_me->item_id) {
+        cout << "select now" << endl;
+        recordTree->SelectItem(select_me->item_id);
+        irt_root.ExpandTreeTo(recordTree, select_me);
+    }
+
+
+    if(irt_root.item_id) {    
+        recordTree->Expand(irt_root.item_id);
+    }
+
+    //recordTree->ExpandAll();
+
+
+    prevSearchString = searchString;
 }
 
 void MainWindow::UpdateRecordPanel() {
@@ -427,12 +581,14 @@ void MainWindow::addFieldToPanel(std::string key, std::vector<std::string> value
             
             entry->SetWindowStyleFlag(entry->GetWindowStyleFlag() | wxTE_PASSWORD);
 
-            buttonGenerate=new wxButton(panelRecord, wxID_ANY, _T("G"));
+            buttonGenerate=new wxButton(panelRecord, wxID_ANY, _T(""));
+            buttonGenerate->SetBitmap(wxArtProvider::GetBitmap("gtk-execute", wxART_MENU));
             buttonGenerate->Bind(wxEVT_BUTTON, &MainWindow::OnFieldGenerate, this, wxID_ANY, wxID_ANY, new FieldButtonUserData(key, i));
             buttonGenerate->SetMinSize(wxSize(30, 30));
             sizerRecord->Add(buttonGenerate, 0, 0, 0);
 
-            buttonHide=new wxButton(panelRecord, wxID_ANY, _T("S"));
+            buttonHide=new wxButton(panelRecord, wxID_ANY, _T(""));
+            buttonHide->SetBitmap(wxArtProvider::GetBitmap("gtk-italic", wxART_MENU));
             buttonHide->Bind(wxEVT_BUTTON, &MainWindow::OnFieldMaskUnmask, this, wxID_ANY, wxID_ANY, new FieldButtonUserData(key, i));
             buttonHide->SetMinSize(wxSize(30, 30));
             sizerRecord->Add(buttonHide, 0, 0, 0);
@@ -441,14 +597,17 @@ void MainWindow::addFieldToPanel(std::string key, std::vector<std::string> value
             sizerRecord->AddSpacer(0);
         }
 
-        buttonCopy=new wxButton(panelRecord, wxID_ANY, _T("C"));
+        buttonCopy=new wxButton(panelRecord, wxID_ANY, _T(""));
+        buttonCopy->SetBitmap(wxArtProvider::GetBitmap(wxART_COPY));
+    
         buttonCopy->Bind(wxEVT_BUTTON, &MainWindow::OnFieldClip, this, wxID_ANY, wxID_ANY, new FieldButtonUserData(key, i));
         buttonCopy->SetMinSize(wxSize(30, 30));
         sizerRecord->Add(buttonCopy, 0, 0, 0);
 
         if(i==values.size()-1) {
             // remove button comes only once per field
-            buttonRemove=new wxButton(panelRecord, wxID_ANY, _T("X"));   
+            buttonRemove=new wxButton(panelRecord, wxID_ANY, _T(""));   
+            buttonRemove->SetBitmap(wxArtProvider::GetBitmap(wxART_MINUS));
             buttonRemove->Bind(wxEVT_BUTTON, &MainWindow::OnFieldRemove, this, wxID_ANY, wxID_ANY, new FieldButtonUserData(key, i));
             buttonRemove->SetMinSize(wxSize(30, 30));
             sizerRecord->Add(buttonRemove, 0, 0, 0);
@@ -527,14 +686,9 @@ void MainWindow::OnButtonRemove(wxCommandEvent &evt)
         st.Save();
     }
 
-
-    cur_record = Record();
-
     UpdateRecordTree();
-    UpdateRecordPanel();
 
-
-    
+    SwitchToNoRecord();
 }
 
 void MainWindow::ShowCommitBar(bool enable) {
@@ -675,9 +829,22 @@ void MainWindow::OnRecordFieldTextEvent(wxCommandEvent &evt)
     ShowCommitBar(true);
 }
 
+void MainWindow::OnFilterApply(wxCommandEvent &evt)
+{
+    cout << "Filter apply!" << endl;
+
+   IRTNode *selected = irt_root.FindByItemId(recordTree->GetSelection());
+
+    if(selected && selected->path_connected) {
+        SwitchToRecord(selected->full_path);
+    }
+}
+
 void MainWindow::OnFilterUpdated(wxCommandEvent &evt)
 {
     cout << "Filter updated!" << endl;
+
+    UpdateRecordTree();
 
     // Todo
 }
