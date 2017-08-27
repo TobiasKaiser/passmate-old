@@ -5,27 +5,53 @@
 #include <vector>
 
 #include <wx/wx.h>
-
 #include <wx/treectrl.h>
 
 #include "Record.hpp"
 
 class MainWindow : public wxFrame {
     public:
+
         MainWindow();
+
     protected:
-        void InitMenu();
 
-        wxScrolledWindow *panelRecord;
-        wxFlexGridSizer *sizerRecord;
-        wxTreeCtrl *recordTree;
-        wxPanel *commitChangeBar;
-
-        bool changesPending;
+        // Internally used methods
+        // -----------------------
 
         void UpdateRecordPanel();
         void UpdateRecordTree();
+        void InitMenu();
+        std::map<std::string, std::vector<std::string>> GetGUIRecord();
+        void SwitchToRecord(std::string path);
+        void SwitchToNoRecord();
+        void ShowCommitBar(bool enable);
+        void addFieldToPanel(std::string key, std::vector<std::string> values);
+        bool isPasswordField(std::string key);
 
+        // Event handler
+        // -------------
+
+        void OnRecordActivated(wxTreeEvent& event);
+        void OnButtonAddRecord(wxCommandEvent &evt);
+        void OnButtonSync(wxCommandEvent &evt);
+        void OnButtonRemove(wxCommandEvent &evt);
+        void OnButtonRename(wxCommandEvent &evt);
+        void OnButtonAddField(wxCommandEvent &evt);
+        void OnButtonSaveChanges(wxCommandEvent &evt);
+        void OnRecordFieldTextEvent(wxCommandEvent &evt);
+        void OnClose(wxCommandEvent& event);
+        void OnSize(wxSizeEvent& event);
+        void OnFilterUpdated(wxCommandEvent &evt);
+        void OnFilterApply(wxCommandEvent &evt);
+
+        void OnFieldGenerate(wxCommandEvent &evt);
+        void OnFieldMaskUnmask(wxCommandEvent &evt);
+        void OnFieldClip(wxCommandEvent &evt);
+        void OnFieldRemove(wxCommandEvent &evt);
+
+        // Helper classes
+        // --------------
 
         class FieldButtonUserData : public wxObject {
             // FieldButtonUserData is basically just a pair<string,int>, but manageable by wx memory management, thus usable as user data for button events.
@@ -43,21 +69,24 @@ class MainWindow : public wxFrame {
 
         };
 
-        // Intermediate Record Tree Node: This is responsible for turning the flat record structure into a tree structure based on "/" as a delimiter.
         class IRTNode {
+            // Intermediate Record Tree Node: This is responsible for turning the flat record structure into a tree structure based on "/" as a delimiter.
             public:
+                // Constructors:
                 IRTNode(IRTNode *parent, std::string node_name);
                 IRTNode *GetChildForceCreate(std::string new_node_name);
-                void AppendToTreeCtrl(wxTreeCtrl *tree);
+                
+                // Methods:
                 MainWindow::IRTNode *FindByItemId(const wxTreeItemId &search_id);
                 MainWindow::IRTNode *FindByPath(const std::string &path);
-
-                bool ExpandTreeTo(wxTreeCtrl *recordTree, IRTNode *dest);
                 MainWindow::IRTNode *FindFirstFiltered(std::string search);
+                void AppendToTreeCtrl(wxTreeCtrl *tree);
+                bool ExpandTreeTo(wxTreeCtrl *recordTree, IRTNode *dest);
                 bool ApplyFilter(std::string search);
 
                 static std::vector<std::string> SplitPath(std::string path);
 
+                // Attributes:
                 std::string node_name;
                 std::string full_path;
                 bool filter_flag;
@@ -67,48 +96,22 @@ class MainWindow : public wxFrame {
                 bool path_connected;
         };
 
-        std::string prevSearchString;
+        // GUI objects
+        // -----------
 
-        IRTNode irt_root;
-
-        Record cur_record;
-        std::map<std::string, std::vector<wxTextCtrl*>> cur_record_text_ctrls;
-
+        wxScrolledWindow *panelRecord;
+        wxFlexGridSizer *sizerRecord;
+        wxTreeCtrl *recordTree;
+        wxPanel *commitChangeBar;
         wxPanel *panelRight;
         wxTextCtrl *entryFilter;
 
-        std::map<std::string, std::vector<std::string>> GetGUIRecord();
+        // Other attributes
+        // ----------------
 
-        void SwitchToRecord(std::string path);
-        void SwitchToNoRecord();
-
-        void ShowCommitBar(bool enable);
-
-        void OnRecordActivated(wxTreeEvent& event);
-        void OnButtonAddRecord(wxCommandEvent &evt);
-        void OnButtonSync(wxCommandEvent &evt);
-        void OnButtonRemove(wxCommandEvent &evt);
-        void OnButtonRename(wxCommandEvent &evt);
-        void OnButtonAddField(wxCommandEvent &evt);
-        void OnButtonSaveChanges(wxCommandEvent &evt);
-        void OnButtonHistory(wxCommandEvent &evt);
-        void OnRecordFieldTextEvent(wxCommandEvent &evt);
-        void OnClose(wxCommandEvent& event);
-        void OnSize(wxSizeEvent& event);
-        void OnFilterUpdated(wxCommandEvent &evt);
-        void OnFilterApply(wxCommandEvent &evt);
-
-        void OnFieldGenerate(wxCommandEvent &evt);
-        void OnFieldMaskUnmask(wxCommandEvent &evt);
-        void OnFieldClip(wxCommandEvent &evt);
-        void OnFieldRemove(wxCommandEvent &evt);
-
-
-        void addFieldToPanel(std::string key, std::vector<std::string> values);
-
-        bool isPasswordField(std::string key);
-  
-    private:
-  
-
+        std::string prevSearchString;
+        IRTNode irt_root;
+        Record cur_record;
+        std::map<std::string, std::vector<wxTextCtrl*>> cur_record_text_ctrls;        
+        bool changesPending;
 };

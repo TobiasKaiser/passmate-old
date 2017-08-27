@@ -95,7 +95,8 @@ void Storage::InitCryptoStuff() {
 
 
 // This is a real cheating function, but as long as it works well, it will probably stay here.
-map<string, Record> Storage::GetAllRecords() {
+map<string, Record> Storage::GetAllRecords()
+{
 	map<string, Record> all_records;
 
 	json::iterator record_it, field_it, vect_it;
@@ -137,7 +138,8 @@ map<string, Record> Storage::GetAllRecords() {
 }
 
 
-void Storage::PrintAllRecords() {
+void Storage::PrintAllRecords()
+{
 	map<string, Record> all_records = GetAllRecords();
 
 	for(map<string, Record>::value_type &rec_pair : all_records) {
@@ -152,7 +154,8 @@ void Storage::PrintAllRecords() {
 	}
 }
 
-Record Storage::GetRecord(string const &path) {
+Record Storage::GetRecord(string const &path)
+{
 	map<string, Record> all_records = GetAllRecords();
 
 	if(all_records.count(path)) {
@@ -162,50 +165,18 @@ Record Storage::GetRecord(string const &path) {
 	}
 }
 
-/*
-
-	def get_all_records(self):
-		records={}
-		for rid, rec in self.data.items():
-			path=None
-			filtered_rec={"rid":rid}
-			for kv in rec:
-				key=kv[key_field]
-				#t=kv[time_field]
-				values=kv[2:]
-				if key=="PATH":
-					if len(values)==1:
-						path=values[0]
-					else:
-						path=None # ignore deleted records
-				if key.startswith("_"):
-					filtered_rec[key]=values
-			if path:
-				records[path]=filtered_rec
-		return records
-*/
-
 void Storage::SetPassphrase(string new_passphrase) {
-
-}
-/*
-	def set_passphrase(self, new_passphrase):
-		self.passphrase=new_passphrase
-		self.changed=True
-*/
-
-
-void Storage::Close() {
-
+	passphrase = new_passphrase;
+	changed = true;
 }
 
-/*
-	def close(self):
-		self.f.close()
-*/
+void Storage::Close()
+{
+	// This is where we could free a lock or something
+}
 
-
-void Storage::Save() {
+void Storage::Save()
+{
 	if(!changed)
 		return;
 
@@ -335,7 +306,8 @@ json Storage::MergeRecords(const json &local, const json &remote, const string &
  * Here comes the real core stuff
  **************************************************************************/
 
-void Storage::NewRecord(string const &path) {
+void Storage::NewRecord(string const &path)
+{
 	if(PathExists(path)) {
 		throw Exception(Exception::PATH_ALREADY_EXISTS);
 	}
@@ -345,7 +317,8 @@ void Storage::NewRecord(string const &path) {
 
 }
 
-string Storage::GenerateNewRID() {
+string Storage::GenerateNewRID()
+{
 	uint32_t newRid = 0;
 	string newRidStr;
 
@@ -375,13 +348,15 @@ bool Storage::CheckPassphrase(string const &check) {
 	return check==passphrase;
 }
 
-bool Storage::PathExists(string const &path) {
+bool Storage::PathExists(string const &path)
+{
 	map<string, Record> all_records =  GetAllRecords();
 
 	return all_records.count(path);
 }
 
-vector<string> Storage::List() {
+vector<string> Storage::List()
+{
 	map<string, Record> all_records =  GetAllRecords();
 
 	vector<string> ret;
@@ -395,11 +370,13 @@ vector<string> Storage::List() {
 
 }
 
-void Storage::DeleteRecord(string &path) {
+void Storage::DeleteRecord(string &path)
+{
 	RecordSetRaw(path, "PATH", vector<string>());
 }
 
-void Storage::MoveRecord(string const &new_path, string const &old_path) {
+void Storage::MoveRecord(string const &new_path, string const &old_path)
+{
 	if(PathExists(new_path)) {
 		throw Exception(Exception::PATH_ALREADY_EXISTS); 
 	}
@@ -408,12 +385,8 @@ void Storage::MoveRecord(string const &new_path, string const &old_path) {
 }
 
 
-/*
-	def fix_times(self):
-		raise BackendError(BackendError.NOT_IMPLEMENTED) # TODO
-*/
-
-void Storage::RecordSetRaw(string const &path, string const &key, vector<string> const &values) {
+void Storage::RecordSetRaw(string const &path, string const &key, vector<string> const &values)
+{
 	string rid = GetAllRecords()[path].GetId();
 
 	// Todo: Check if newer value already exists. If it does, raise NEWER_VALUE_ALREADY_EXISTS exception.
@@ -425,31 +398,23 @@ void Storage::RecordSetRaw(string const &path, string const &key, vector<string>
  	}
 	
  	data[rid].push_back(insertMe);
- 	cout << "yoyo" << endl;
-
+ 	
 	changed = true;
 }
 
-/*
-	def _record_set_without_underscore(self, path, key, vals):
-		rid=self.get_all_records()[path]["rid"]
-		now=int(time.time())
-		if max(map(lambda x: x[time_field], self.data[rid])) >= now:
-			raise BackendError(BackendError.NEWER_VALUE_ALREADY_EXISTS) 
-		self.data[rid].append(
-			[key, now]+vals
-		)
-		self.changed=True
-*/
-
-void Storage::RecordSet(string const &path, string const &key, vector<string> const &values) {
+void Storage::RecordSet(string const &path, string const &key, vector<string> const &values)
+{
 	RecordSetRaw(path, "_" + key, values);
 }
 
-void Storage::RecordUnset(string const &path, string const &key) {
+void Storage::RecordUnset(string const &path, string const &key)
+{
 	RecordSetRaw(path, "_" + key, vector<string>());
 }
 
+
+// Storage::Exception
+// ------------------
 
 Storage::Exception::Exception(Storage::Exception::Err errCode) throw()
 {

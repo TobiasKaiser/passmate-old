@@ -150,29 +150,6 @@ MainWindow::MainWindow()
     //panelRecord->ShowScrollbars(wxSHOW_SB_ALWAYS, wxSHOW_SB_ALWAYS);
 }
 
-void MainWindow::OnSize(wxSizeEvent& event) {
-    /*//printf("resize event\n");    
-    //wxSize size = panelRecord->GetBestVirtualSize();
-    //panelRecord->SetVirtualSize( size );
-    sizerRecord->FitInside(panelRecord);
-    panelRecord->Layout();
-
-    Layout();
-
-
-    int prX, prY, mX, mY;
-
-    panelRecord->GetSize(&prX, &prY);
-    panelRecord->GetVirtualSize(&mX, &mY);
-
-
-
-    printf("%04i %04i %04i %04i\n", mX, mY, prX, prY);
-    */
-    Layout();
-}
-
-
 void MainWindow::SwitchToRecord(std::string path)
 {
     // TODO: Ask for confirmation if there are changes to the current record here.
@@ -194,213 +171,6 @@ void MainWindow::SwitchToNoRecord(void)
     UpdateRecordPanel();   
 }
 
-void MainWindow::OnRecordActivated(wxTreeEvent& event) {
-    IRTNode *selected = irt_root.FindByItemId(event.GetItem());
-
-    if(selected && selected->path_connected) {
-        SwitchToRecord(selected->full_path);
-    }    
-}
-
-MainWindow::IRTNode::IRTNode(IRTNode *parent, std::string node_name) {
-    this->parent = parent;
-
-    this->node_name=node_name;
-
-    full_path="";
-    path_connected = false;
-
-    filter_flag = true;
-}
-
-MainWindow::IRTNode *MainWindow::IRTNode::GetChildForceCreate(std::string new_node_name) {
-    // If we already have it, return that:
-    for(IRTNode &node : children) {
-        if(node.node_name == new_node_name)
-            return &node;
-    }
-
-    // Else make a new one, append and return:
-    children.push_back(IRTNode(this, new_node_name));
-
-    return &children.back();
-}
-
-
-std::vector<std::string> MainWindow::IRTNode::SplitPath(std::string path) {
-
-    vector<string> ret;
-    
-    size_t tokEnd = 0;
-    while ((tokEnd = path.find("/")) != string::npos) {
-        ret.push_back(path.substr(0, tokEnd));
-        path.erase(0, tokEnd + 1);
-    }
-    ret.push_back(path);
-
-    return ret;
-}
-
-MainWindow::IRTNode *MainWindow::IRTNode::FindByPath(const std::string &path) {
-    if(full_path == path)
-        return this;
-
-    for(IRTNode &child : children) {
-        IRTNode *result;
-        result = child.FindByPath(path);
-
-        if(result)
-            return result;
-    }
-
-    return NULL;
-}
-
-
-MainWindow::IRTNode *MainWindow::IRTNode::FindByItemId(const wxTreeItemId &search_id){
-    if(item_id == search_id)
-        return this;
-
-    for(IRTNode &child : children) {
-        IRTNode *result;
-        result = child.FindByItemId(search_id);
-
-        if(result)
-            return result;
-    }
-
-    return NULL;
-}
-
-
-void MainWindow::IRTNode::AppendToTreeCtrl(wxTreeCtrl *tree) {
-    if(!filter_flag)
-        return;
-
-    if(parent) {
-        item_id = tree->AppendItem(parent->item_id, node_name);
-    } else {
-        item_id = tree->AddRoot(node_name);
-    }
-
-    for(MainWindow::IRTNode &child : children) {
-        child.AppendToTreeCtrl(tree);
-    }
-}
-
-void MainWindow::OnFieldGenerate(wxCommandEvent &evt)
-{
-    FieldButtonUserData *ud = (FieldButtonUserData *) evt.GetEventUserData();
-    cout << "Field generate " << ud->GetFieldName() << ", " << ud->GetValueIdx() << endl;
-
-}
-
-void MainWindow::OnFieldMaskUnmask(wxCommandEvent &evt)
-{
-    FieldButtonUserData *ud = (FieldButtonUserData *) evt.GetEventUserData();
-    cout << "Field mask unmask " << ud->GetFieldName() << ", " << ud->GetValueIdx() << endl;
-
-
-    wxTextCtrl *entry = cur_record_text_ctrls[ud->GetFieldName()][ud->GetValueIdx()];
-
-
-    long flags = entry->GetWindowStyleFlag();
-    if ((flags & wxTE_PASSWORD)) {
-        // password is masked, so unmask it now
-        entry->SetWindowStyleFlag(flags & ~wxTE_PASSWORD);
-    } else {
-        // password is unmasked, so mask it now
-        entry->SetWindowStyleFlag(flags | wxTE_PASSWORD);
-    }
-
-    entry->Refresh();
-    
-}
-
-void MainWindow::OnFieldClip(wxCommandEvent &evt)
-{
-    FieldButtonUserData *ud = (FieldButtonUserData *) evt.GetEventUserData();
-    cout << "Field clip " << ud->GetFieldName() << ", " << ud->GetValueIdx() << endl;
-
-    wxTextCtrl *entry = cur_record_text_ctrls[ud->GetFieldName()][ud->GetValueIdx()];
-
-    //wxClipboard clipboard = wxClipboard();
-    if(wxTheClipboard->Open()) {
-        //clipboard.Clear();
-        wxTheClipboard->SetData( new wxTextDataObject( entry->GetValue() ) );
-        wxTheClipboard->Flush();
-        wxTheClipboard->Close();      
-    }
-}
-
-void MainWindow::OnFieldRemove(wxCommandEvent &evt)
-{
-    FieldButtonUserData *ud = (FieldButtonUserData *) evt.GetEventUserData();
-    cout << "Field remove " << ud->GetFieldName() << ", " << ud->GetValueIdx() << endl;
-
-    vector<wxTextCtrl *> allValueEntries = cur_record_text_ctrls[ud->GetFieldName()];
-
-    for(const auto &entry : allValueEntries) {
-        entry->Enable(false);
-        entry->ChangeValue(wxT("")); // in contrast to SetValue, this does not make a event.
-    }
-
-    ShowCommitBar(true);
-
-}
-
-
-bool MainWindow::IRTNode::ApplyFilter(std::string search)
-{
-    filter_flag = false;
-
-
-    for(IRTNode &child : children) {
-        if(child.ApplyFilter(search))
-            filter_flag = true;
-    }
-
-    if(!filter_flag && (full_path.find(search) != string::npos)) {
-        filter_flag = true;
-    }
-
-    return filter_flag;
-}
-
-MainWindow::IRTNode *MainWindow::IRTNode::FindFirstFiltered(std::string search)
-{
-    if(filter_flag && path_connected) {
-        return this;
-    }
-
-    for(IRTNode &child : children) {
-        IRTNode *ret;
-        ret = child.FindFirstFiltered(search);
-        if(ret) {
-            return ret;
-        }
-    }
-    return NULL;
-}
-
-bool MainWindow::IRTNode::ExpandTreeTo(wxTreeCtrl *recordTree, IRTNode *dest)
-{
-    if(dest == this) {
-        if(item_id)
-            recordTree->Expand(item_id);
-        return true;
-    }
-
-    for(IRTNode &child : children) {
-        if(child.ExpandTreeTo(recordTree, dest)) {
-            if(item_id)
-                recordTree->Expand(item_id);
-            return true;
-        }
-    }
-
-    return false;
-}
 
 void MainWindow::UpdateRecordTree()
 {
@@ -453,12 +223,8 @@ void MainWindow::UpdateRecordTree()
     IRTNode *select_me = NULL;
 
     if(selected_before && selected_after && selected_after->item_id) {
-        cout << "y" << endl;
-        
         select_me = selected_after;
     } else if(searchString.length() > 0) {
-        cout << "z" << endl;
-        
         // on empty search string, select nothing, unless there was a selection before.
         select_me = irt_root.FindFirstFiltered(searchString);
     }
@@ -470,7 +236,6 @@ void MainWindow::UpdateRecordTree()
 
 
     if(select_me && select_me->item_id) {
-        cout << "select now" << endl;
         recordTree->SelectItem(select_me->item_id);
         irt_root.ExpandTreeTo(recordTree, select_me);
     }
@@ -480,13 +245,11 @@ void MainWindow::UpdateRecordTree()
         recordTree->Expand(irt_root.item_id);
     }
 
-    //recordTree->ExpandAll();
-
-
     prevSearchString = searchString;
 }
 
-void MainWindow::UpdateRecordPanel() {
+void MainWindow::UpdateRecordPanel()
+{
 
     sizerRecord->Clear(true);
 
@@ -539,7 +302,8 @@ void MainWindow::UpdateRecordPanel() {
 
 }
 
-bool MainWindow::isPasswordField(std::string key) {
+bool MainWindow::isPasswordField(std::string key)
+{
     regex passwordRegex("^password.*");
     return regex_match(key, passwordRegex);
 }
@@ -617,7 +381,8 @@ void MainWindow::addFieldToPanel(std::string key, std::vector<std::string> value
     }
 }
 
-void MainWindow::InitMenu() {
+void MainWindow::InitMenu()
+{
     // Setup menu
     wxMenuBar *menubar = new wxMenuBar();
     wxMenu *menuStore, *menuSync, *menuHelp;
@@ -638,12 +403,41 @@ void MainWindow::InitMenu() {
     SetMenuBar(menubar);
 }
 
-void MainWindow::OnClose(wxCommandEvent& WXUNUSED(event)) {
+void MainWindow::ShowCommitBar(bool enable)
+{
+    changesPending=enable;
+    if(enable) {
+        commitChangeBar->Show();
+    } else {
+        commitChangeBar->Hide();
+    }
+    panelRight->Layout();
+}
+
+std::map<std::string, std::vector<std::string>>  MainWindow::GetGUIRecord()
+{
+    std::map<std::string, std::vector<std::string>> ret;
+    for(auto const &curField : cur_record_text_ctrls) {
+        if(!curField.second[0]->IsThisEnabled()) {
+            continue; // the field has been removed and is now grayed out until we press save.
+        }
+        ret[curField.first] = vector<string>();
+        for(auto const &curValue : curField.second) {
+             ret[curField.first].push_back(string(curValue->GetValue()));
+        }
+    }
+
+    return ret;
+}
+
+// Event handler methods
+// ---------------------
+
+void MainWindow::OnClose(wxCommandEvent& WXUNUSED(event))
+{
     // true is to force the frame to close
     Close(true);
 }
-
-
 
 void MainWindow::OnButtonAddRecord(wxCommandEvent &evt)
 {
@@ -665,7 +459,7 @@ void MainWindow::OnButtonAddRecord(wxCommandEvent &evt)
 
 void MainWindow::OnButtonSync(wxCommandEvent &evt)
 {
-
+    cout << "sync not implemented yet" << endl;
 }
 
 void MainWindow::OnButtonRemove(wxCommandEvent &evt)
@@ -689,18 +483,6 @@ void MainWindow::OnButtonRemove(wxCommandEvent &evt)
     UpdateRecordTree();
 
     SwitchToNoRecord();
-}
-
-void MainWindow::ShowCommitBar(bool enable) {
-    changesPending=enable;
-    if(enable) {
-        commitChangeBar->Show();
-    } else {
-        commitChangeBar->Hide();
-    }
-    panelRight->Layout();
-
-    //Refresh();
 }
 
 void MainWindow::OnButtonRename(wxCommandEvent &evt)
@@ -780,23 +562,6 @@ void MainWindow::OnButtonAddField(wxCommandEvent &evt)
     
 }
 
-
-std::map<std::string, std::vector<std::string>>  MainWindow::GetGUIRecord()
-{
-    std::map<std::string, std::vector<std::string>> ret;
-    for(auto const &curField : cur_record_text_ctrls) {
-        if(!curField.second[0]->IsThisEnabled()) {
-            continue; // the field has been removed and is now grayed out until we press save.
-        }
-        ret[curField.first] = vector<string>();
-        for(auto const &curValue : curField.second) {
-             ret[curField.first].push_back(string(curValue->GetValue()));
-        }
-    }
-
-    return ret;
-}
-
 void MainWindow::OnButtonSaveChanges(wxCommandEvent &evt)
 {
     Storage &st = wxGetApp().GetStorage();
@@ -819,11 +584,6 @@ void MainWindow::OnButtonSaveChanges(wxCommandEvent &evt)
     }    
 }
 
-void MainWindow::OnButtonHistory(wxCommandEvent &evt)
-{
-
-}
-
 void MainWindow::OnRecordFieldTextEvent(wxCommandEvent &evt)
 {
     ShowCommitBar(true);
@@ -831,9 +591,7 @@ void MainWindow::OnRecordFieldTextEvent(wxCommandEvent &evt)
 
 void MainWindow::OnFilterApply(wxCommandEvent &evt)
 {
-    cout << "Filter apply!" << endl;
-
-   IRTNode *selected = irt_root.FindByItemId(recordTree->GetSelection());
+    IRTNode *selected = irt_root.FindByItemId(recordTree->GetSelection());
 
     if(selected && selected->path_connected) {
         SwitchToRecord(selected->full_path);
@@ -842,9 +600,227 @@ void MainWindow::OnFilterApply(wxCommandEvent &evt)
 
 void MainWindow::OnFilterUpdated(wxCommandEvent &evt)
 {
-    cout << "Filter updated!" << endl;
-
     UpdateRecordTree();
+}
 
-    // Todo
+
+void MainWindow::OnRecordActivated(wxTreeEvent& event)
+{
+    IRTNode *selected = irt_root.FindByItemId(event.GetItem());
+
+    if(selected && selected->path_connected) {
+        SwitchToRecord(selected->full_path);
+    }    
+}
+
+
+void MainWindow::OnFieldGenerate(wxCommandEvent &evt)
+{
+    FieldButtonUserData *ud = (FieldButtonUserData *) evt.GetEventUserData();
+    cout << "Field generate " << ud->GetFieldName() << ", " << ud->GetValueIdx() << endl;
+
+}
+
+void MainWindow::OnFieldMaskUnmask(wxCommandEvent &evt)
+{
+    FieldButtonUserData *ud = (FieldButtonUserData *) evt.GetEventUserData();
+    cout << "Field mask unmask " << ud->GetFieldName() << ", " << ud->GetValueIdx() << endl;
+
+
+    wxTextCtrl *entry = cur_record_text_ctrls[ud->GetFieldName()][ud->GetValueIdx()];
+
+
+    long flags = entry->GetWindowStyleFlag();
+    if ((flags & wxTE_PASSWORD)) {
+        // password is masked, so unmask it now
+        entry->SetWindowStyleFlag(flags & ~wxTE_PASSWORD);
+    } else {
+        // password is unmasked, so mask it now
+        entry->SetWindowStyleFlag(flags | wxTE_PASSWORD);
+    }
+
+    entry->Refresh();
+    
+}
+
+void MainWindow::OnFieldClip(wxCommandEvent &evt)
+{
+    FieldButtonUserData *ud = (FieldButtonUserData *) evt.GetEventUserData();
+    cout << "Field clip " << ud->GetFieldName() << ", " << ud->GetValueIdx() << endl;
+
+    wxTextCtrl *entry = cur_record_text_ctrls[ud->GetFieldName()][ud->GetValueIdx()];
+
+    //wxClipboard clipboard = wxClipboard();
+    if(wxTheClipboard->Open()) {
+        //clipboard.Clear();
+        wxTheClipboard->SetData( new wxTextDataObject( entry->GetValue() ) );
+        wxTheClipboard->Flush();
+        wxTheClipboard->Close();      
+    }
+}
+
+void MainWindow::OnFieldRemove(wxCommandEvent &evt)
+{
+    FieldButtonUserData *ud = (FieldButtonUserData *) evt.GetEventUserData();
+    cout << "Field remove " << ud->GetFieldName() << ", " << ud->GetValueIdx() << endl;
+
+    vector<wxTextCtrl *> allValueEntries = cur_record_text_ctrls[ud->GetFieldName()];
+
+    for(const auto &entry : allValueEntries) {
+        entry->Enable(false);
+        entry->ChangeValue(wxT("")); // in contrast to SetValue, this does not make a event.
+    }
+
+    ShowCommitBar(true);
+}
+
+void MainWindow::OnSize(wxSizeEvent& event)
+{
+    Layout();
+}
+
+// IRTNode methods
+// ---------------
+
+MainWindow::IRTNode::IRTNode(IRTNode *parent, std::string node_name)
+{
+    this->parent = parent;
+
+    this->node_name=node_name;
+
+    full_path="";
+    path_connected = false;
+
+    filter_flag = true;
+}
+
+MainWindow::IRTNode *MainWindow::IRTNode::GetChildForceCreate(std::string new_node_name)
+{
+    // If we already have it, return that:
+    for(IRTNode &node : children) {
+        if(node.node_name == new_node_name)
+            return &node;
+    }
+
+    // Else make a new one, append and return:
+    children.push_back(IRTNode(this, new_node_name));
+
+    return &children.back();
+}
+
+
+std::vector<std::string> MainWindow::IRTNode::SplitPath(std::string path)
+{
+    vector<string> ret;
+    
+    size_t tokEnd = 0;
+    while ((tokEnd = path.find("/")) != string::npos) {
+        ret.push_back(path.substr(0, tokEnd));
+        path.erase(0, tokEnd + 1);
+    }
+    ret.push_back(path);
+
+    return ret;
+}
+
+MainWindow::IRTNode *MainWindow::IRTNode::FindByPath(const std::string &path)
+{
+    if(full_path == path)
+        return this;
+
+    for(IRTNode &child : children) {
+        IRTNode *result;
+        result = child.FindByPath(path);
+
+        if(result)
+            return result;
+    }
+
+    return NULL;
+}
+
+
+MainWindow::IRTNode *MainWindow::IRTNode::FindByItemId(const wxTreeItemId &search_id)
+{
+    if(item_id == search_id)
+        return this;
+
+    for(IRTNode &child : children) {
+        IRTNode *result;
+        result = child.FindByItemId(search_id);
+
+        if(result)
+            return result;
+    }
+
+    return NULL;
+}
+
+
+void MainWindow::IRTNode::AppendToTreeCtrl(wxTreeCtrl *tree)
+{
+    if(!filter_flag)
+        return;
+
+    if(parent) {
+        item_id = tree->AppendItem(parent->item_id, node_name);
+    } else {
+        item_id = tree->AddRoot(node_name);
+    }
+
+    for(MainWindow::IRTNode &child : children) {
+        child.AppendToTreeCtrl(tree);
+    }
+}
+
+bool MainWindow::IRTNode::ApplyFilter(std::string search)
+{
+    filter_flag = false;
+
+
+    for(IRTNode &child : children) {
+        if(child.ApplyFilter(search))
+            filter_flag = true;
+    }
+
+    if(!filter_flag && (full_path.find(search) != string::npos)) {
+        filter_flag = true;
+    }
+
+    return filter_flag;
+}
+
+MainWindow::IRTNode *MainWindow::IRTNode::FindFirstFiltered(std::string search)
+{
+    if(filter_flag && path_connected) {
+        return this;
+    }
+
+    for(IRTNode &child : children) {
+        IRTNode *ret;
+        ret = child.FindFirstFiltered(search);
+        if(ret) {
+            return ret;
+        }
+    }
+    return NULL;
+}
+
+bool MainWindow::IRTNode::ExpandTreeTo(wxTreeCtrl *recordTree, IRTNode *dest)
+{
+    if(dest == this) {
+        if(item_id)
+            recordTree->Expand(item_id);
+        return true;
+    }
+
+    for(IRTNode &child : children) {
+        if(child.ExpandTreeTo(recordTree, dest)) {
+            if(item_id)
+                recordTree->Expand(item_id);
+            return true;
+        }
+    }
+
+    return false;
 }

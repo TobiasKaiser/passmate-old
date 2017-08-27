@@ -6,7 +6,8 @@
 
 using namespace std;
 
-void Record::UpdateByVect(std::string vect_name, long long vect_timestamp, std::vector<std::string> vect_value) {
+void Record::UpdateByVect(std::string vect_name, long long vect_timestamp, std::vector<std::string> vect_value)
+{
 	bool doUpdate;
 
 	// TODO: Assert that vect_value has at least size 1.
@@ -35,8 +36,8 @@ bool Record::IsValid()
 	return valid;
 }
 
-std::map<std::string, std::vector<std::string>> Record::GetFields() {
-
+std::map<std::string, std::vector<std::string>> Record::GetFields()
+{
 	map<string, vector<string>> ret;
 
 	for(map<string, pair<long long, vector<string>>>::value_type &rec_triple : values) {
@@ -78,7 +79,8 @@ std::map<std::string, std::vector<std::string>> Record::GetFields() {
 	return ret;
 }
 
-void Record::PrintRecord() {
+void Record::PrintRecord()
+{
 	cout << "\t" << "rid=" << GetId() << "\n";
 
 	for(map<string, vector<string>>::value_type &field : GetFields()) {
@@ -96,17 +98,20 @@ void Record::PrintRecord() {
 	}
 }
 
-Record::Record() {
+Record::Record()
+{
 	this->record_id = "INVALID";
 	valid = false;
 }
 
-Record::Record(std::string record_id) {
+Record::Record(std::string record_id)
+{
 	this->record_id = record_id;
 	valid = true;
 }
 
-bool Record::IsHidden() {
+bool Record::IsHidden()
+{
 	if(values.count("PATH")) {
 		if(values["PATH"].second.size()<1 || values["PATH"].second[0].size()<1) {
 			return true;
@@ -119,7 +124,8 @@ bool Record::IsHidden() {
 }
 
 
-std::string Record::GetPath() {
+std::string Record::GetPath()
+{
 	if(values.count("PATH")) {
 		if(values["PATH"].second.size()<1 || values["PATH"].second[0].size()<1) {
 			return "@DeletedRecord/"+GetId();
@@ -131,12 +137,14 @@ std::string Record::GetPath() {
 	}
 }
 
-std::string Record::GetId() {
+std::string Record::GetId()
+{
 	return record_id;
 }
 
 // set dest = NULL to dry run
-string Record::SetNewFieldsToStorage(Storage *dest, map<string, vector<string>> &newFields) {
+string Record::SetNewFieldsToStorage(Storage *dest, map<string, vector<string>> &newFields)
+{
 	stringstream changeSummary;
 
 	map<string, vector<string>> oldFields = GetFields();
