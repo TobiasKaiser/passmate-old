@@ -4,7 +4,11 @@
 #include <ctime>
 #include <cstdio>
 #include <string>
+#include <errno.h>
+#include <sys/stat.h>
+
 #include "ScryptEnc.hpp"
+
 
 using json = nlohmann::json;
 using namespace std;
@@ -12,6 +16,7 @@ using namespace std;
 Storage::Storage(string filename) {
 	changed = false;
 	valid = false;
+	paranoidFileBackup = true;
 	InitCryptoStuff();
 	this->filename = filename;
 }
@@ -266,10 +271,29 @@ void Storage::Save()
 
 	cout << "saving!" << endl;
 
-	string tmp_filename = filename + ".prev";
-	//rename(filename.c_str(), tmp_filename.c_str());
+	if(paranoidFileBackup) {
+		bool counterEndReached = false;
+		int counter=0;
+		string backupFilename;
+		while(!counterEndReached) {
+			struct stat myStat;
+			stringstream backupFilename_stream;
+			backupFilename_stream << filename << ".bak" << setw(5) << setfill('0') << counter;
+	     	backupFilename = backupFilename_stream.str();
+	     	cout << backupFilename << endl;
+	     	if(stat(backupFilename.c_str(),&myStat)) {
+	     		counterEndReached=true;
+	     	} else {
+	     		counter++;
+	     	}
+		}
+		//string tmp_filename = filename + ".prev";
+		rename(filename.c_str(), backupFilename.c_str());
+	}
 
-	ofstream f(filename);
+	string filenameTempNew = filename + ".new";
+
+	ofstream f(filenameTempNew);
 
 	if(!f.good()) {
 		throw Exception(Exception::ERROR_SAVING_FILE);
@@ -289,11 +313,7 @@ void Storage::Save()
 
 		cout << "encrypt rc: " << rc << endl;
 
-
-
 		f.write(&outbuf[0], outbuf.size());
-
-		
 
 	} else {
 		// Save JSON unencrypted
@@ -304,26 +324,10 @@ void Storage::Save()
 		//	throw Exception(Exception::ERROR_SAVING_FILE);
 		//}
 	}
-}
-/*
-	def save(self):
-		if not self.changed: return
-		
-		self.f.seek(0)
-		self.f.truncate(0)
-		
-		if self.raw:
-			json.dump([self.data, self.config], self.f)
-		else:
-			cleartext=json.dumps([self.data, self.config])
-			cleartext=spacepad4k(cleartext)
-			ciphertext=scrypt.encrypt(cleartext, self.passphrase,
-				maxtime=2.5, maxmem=0, maxmemfrac=0.5)
-			self.f.write(ciphertext)
 
-		self.f.flush()
-		self.f.seek(0)
-*/
+	rename(filenameTempNew.c_str(), filename.c_str());
+
+}
 
 /*
 	def encrypt_data_without_config(self):
@@ -550,4 +554,3 @@ const char* Storage::Exception::what() const throw()
 		default: return "???";
 	}
 }
-	

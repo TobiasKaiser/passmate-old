@@ -104,4 +104,6 @@ class Storage {
 
     	std::string filename;
 
+    	bool paranoidFileBackup;
+
 };

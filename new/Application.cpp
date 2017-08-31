@@ -1,4 +1,5 @@
 #include <string>
+#include <cstdlib>
 
 #include <wx/msgdlg.h>
 
@@ -15,7 +16,7 @@ wxIMPLEMENT_APP(Application);
 
 Application::Application() {
     storage=NULL;
-    storage_filename = "/home/tobias/workspace/passmate/new/test.pmate";
+    storage_filename = string(getenv("HOME")) + "/.pmate";
 }
 
 bool Application::OnInit() {
