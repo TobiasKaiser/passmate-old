@@ -8,7 +8,8 @@ CXXFLAGS+=-g -O0 # debug me
 LIBS+=$(shell wx-config --libs) -lscrypt -lmbedtls -lmbedcrypto
 LDFLAGS=$(CXXFLAGS)
 TARGET=passmate
-SRC=$(wildcard *.cpp)
+#SRC=$(wildcard *.cpp)
+SRC=Record.cpp Storage.cpp MainWindow.cpp Application.cpp ScryptEncCPUPerf.cpp ScryptEnc.cpp
 EECHO=echo
 .PHONY: all
 all: $(TARGET)
