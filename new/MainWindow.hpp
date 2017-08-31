@@ -44,6 +44,10 @@ class MainWindow : public wxFrame {
         void OnSize(wxSizeEvent& event);
         void OnFilterUpdated(wxCommandEvent &evt);
         void OnFilterApply(wxCommandEvent &evt);
+        void OnQuit(wxCommandEvent &evt);
+        void OnDoc(wxCommandEvent &evt);
+        void OnHelp(wxCommandEvent &evt);
+        void OnChangePass(wxCommandEvent &evt);
 
         void OnFieldGenerate(wxCommandEvent &evt);
         void OnFieldMaskUnmask(wxCommandEvent &evt);
@@ -105,6 +109,8 @@ class MainWindow : public wxFrame {
         wxPanel *commitChangeBar;
         wxPanel *panelRight;
         wxTextCtrl *entryFilter;
+
+        int menuIdChangePass, menuIdDoc, menuIdHelp, menuIdSync;
 
         // Other attributes
         // ----------------

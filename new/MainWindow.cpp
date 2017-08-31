@@ -389,16 +389,22 @@ void MainWindow::InitMenu()
     menuStore = new wxMenu();
     menuSync = new wxMenu();
     menuHelp = new wxMenu();
+    menuIdChangePass = menuStore->Append(wxID_ANY, wxT("Change &Passphrase"))->GetId();
     menuStore->Append(wxID_EXIT, wxT("&Quit"));
 
 
-    menuHelp->Append(wxID_ANY, wxT("&Documentation"));;
-    menuHelp->Append(wxID_ANY, wxT("Visit &Website"));
-    
+    menuIdDoc = menuHelp->Append(wxID_ANY, wxT("&Documentation"))->GetId();
+    menuIdHelp = menuHelp->Append(wxID_ANY, wxT("Visit &Website"))->GetId();
+    menuIdSync = menuSync->Append(wxID_ANY, wxT("&Sync now"))->GetId();
 
     menubar->Append(menuStore, wxT("&Store"));
     menubar->Append(menuSync, wxT("S&ync"));
     menubar->Append(menuHelp, wxT("&Help"));
+
+    Bind(wxEVT_COMMAND_MENU_SELECTED, &MainWindow::OnQuit, this, wxID_EXIT);
+    Bind(wxEVT_COMMAND_MENU_SELECTED, &MainWindow::OnChangePass, this, menuIdChangePass);
+    Bind(wxEVT_COMMAND_MENU_SELECTED, &MainWindow::OnDoc, this, menuIdDoc);
+    Bind(wxEVT_COMMAND_MENU_SELECTED, &MainWindow::OnHelp, this, menuIdHelp);
 
     SetMenuBar(menubar);
 }
@@ -432,6 +438,58 @@ std::map<std::string, std::vector<std::string>>  MainWindow::GetGUIRecord()
 
 // Event handler methods
 // ---------------------
+
+
+void MainWindow::OnChangePass(wxCommandEvent &evt) {
+    Storage &st = wxGetApp().GetStorage();
+
+    // Check previous passphrase
+
+
+
+    // Set new passphrase
+    wxPasswordEntryDialog passwordDialog1(NULL, wxT("Enter new passphrase:"));
+    wxPasswordEntryDialog passwordDialog2(NULL, wxT("Repeat new passphrase:"));
+    
+    bool passwordsMatching;
+    do {
+        passwordDialog1.SetValue(wxString(""));
+        passwordDialog2.SetValue(wxString(""));
+        if(passwordDialog1.ShowModal() != wxID_OK) {
+            return;
+        }
+        if(passwordDialog2.ShowModal() != wxID_OK) {
+            return;
+        }
+        passwordsMatching=(string(passwordDialog1.GetValue()) == string(passwordDialog2.GetValue()));
+        if(!passwordsMatching) {
+            wxMessageDialog errDialog(NULL, wxString("You entered two different passphrases. Please try again."), wxT("Error"), wxOK|wxCENTRE);
+            errDialog.ShowModal();
+        }
+
+    } while (!passwordsMatching);
+
+    try {
+        st.SetPassphrase(string(passwordDialog1.GetValue()));
+        st.Save();
+    } catch(const Storage::Exception &stex) {
+        wxMessageDialog errDialog(NULL, wxString("Error: "+ string(stex.what())), wxT("Error"), wxOK|wxCENTRE);
+        errDialog.ShowModal();
+    }
+}
+
+void MainWindow::OnDoc(wxCommandEvent &evt) {
+    wxLaunchDefaultBrowser("https://www.passmate.net/docs/", 0);
+}
+
+void MainWindow::OnHelp(wxCommandEvent &evt) {
+    wxLaunchDefaultBrowser("https://www.passmate.net/", 0);
+}
+
+
+void MainWindow::OnQuit(wxCommandEvent &evt) {
+    cout << "quit" << endl;
+}
 
 void MainWindow::OnClose(wxCommandEvent& WXUNUSED(event))
 {
@@ -494,7 +552,6 @@ void MainWindow::OnButtonRename(wxCommandEvent &evt)
 
     if(changesPending) {
         wxMessageDialog msgBox(this, wxString("Please save record before renaming."), wxT("Rename"), wxOK|wxCENTRE);
-
         msgBox.ShowModal();
 
         return;

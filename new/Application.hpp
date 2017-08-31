@@ -1,6 +1,8 @@
 #pragma once
-#include <wx/wx.h>
 
+#include <string>
+
+#include <wx/wx.h>
 
 class Storage;
 
@@ -21,6 +23,7 @@ class Application : public wxApp {
 
     protected:
         Storage *storage;
+        std::string storage_filename;
 };
 
 wxDECLARE_APP(Application); // this defines wxGetApp

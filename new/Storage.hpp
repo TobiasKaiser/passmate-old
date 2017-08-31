@@ -25,7 +25,12 @@ class Storage {
 
 
 		// Constructor and file-level functions
-		Storage(std::string filename, bool create);
+		Storage(std::string filename);
+
+		bool FileExists(); 
+		
+		void Open(bool create, const std::string &passphrase);
+
 		void Close();
 
 		void Save();
@@ -61,12 +66,16 @@ class Storage {
 					MERGE_ERROR_DUPLICATE_PATH=5,
 					MERGE_ERROR_DUPLICATE_TIME=6,
 					MULTIPLE_INSTANCES_RUNNING=7,
-					CRYPTO_ERROR=8
+					CRYPTO_ERROR=8,
+					FILE_NOT_FOUND=9,
+					JSON_PARSE_ERROR=10,
+					WRONG_PASSPHRASE=11,
+					ERROR_SAVING_FILE=12		
 				};
 
 				Exception(enum Err errCode) throw();
 
-				Err getErrCode();
+				Err getErrCode() const throw();
 
 
 				const char* what() const throw();
@@ -74,6 +83,7 @@ class Storage {
 				enum Err errCode;
 		};
 
+		bool IsValid() { return valid; }
 
 	protected:
 		void RecordSetRaw(std::string const &path, std::string const &key, std::vector<std::string> const &values);
@@ -89,6 +99,8 @@ class Storage {
 		mbedtls_ctr_drbg_context my_prng_ctx;
     
     	bool changed;
+
+    	bool valid;
 
     	std::string filename;
 

@@ -3,33 +3,90 @@
 
 #include <ctime>
 #include <cstdio>
+#include <string>
 
 using json = nlohmann::json;
 using namespace std;
 
-Storage::Storage(string filename, bool create) {
+Storage::Storage(string filename) {
 	changed = false;
-	
+	valid = false;
 	InitCryptoStuff();
-	//GenerateNewRID();
-
 	this->filename = filename;
+}
 
+
+bool Storage::FileExists() {
+	std::ifstream ifile(filename);
+	return (bool)ifile;
+}
+
+
+void Storage::Open(bool create, const string &passphrase) {
 	json j;
 
 	ifstream f(filename);
 	
-	try {
-		if (f.is_open()) {
-			f >> j;
-			data = j[0];
-			config = j[1];;
+	if(f.good()) {
+		if(create) {
+			throw Exception(Exception::FILE_ALREADY_EXISTS);
+		} else {
+			// this case  happens in the bottom
+		}
+	} else {
+		if(create) {
+			data = json::object();
+			config = json::object();
+			valid = true;
+			return;	
+		} else {
+			throw Exception(Exception::FILE_NOT_FOUND);
 		}
 	}
-	catch( const exception & ex ) {
-		// TODO
-		cerr << ex.what() << endl;
+
+	// f is good and create==false
+
+	bool UnencryptedRequested = (passphrase.length() == 0); 
+
+	// Check whether beginning of file is "scrypt"
+	char file_id[7];
+	memset(file_id, 0x00, 7);
+	f.read (file_id, 6);
+	bool FileHasScryptHeader = (f.gcount() == 6 && memcmp(file_id, "scrypt", 6)==0);
+
+	// rewind
+	f.clear();
+	f.seekg(0);
+
+	if(FileHasScryptHeader) {
+		// encrypted file
+		if(UnencryptedRequested) {
+			throw Exception(Exception::WRONG_PASSPHRASE);
+		}
+	
+	} else {
+		// unencrypted file
+		if(!UnencryptedRequested) {
+			throw Exception(Exception::WRONG_PASSPHRASE);
+		}
+
+		try {
+			if (f.is_open()) {
+				f >> j;
+				data = j[0];
+				config = j[1];;
+			}
+		}
+		catch( const exception & ex ) {
+			throw Exception(Exception::JSON_PARSE_ERROR);
+		}
+
 	}
+
+	this->passphrase = passphrase;
+
+	valid=true;
+	
 }
 
 void Storage::InitCryptoStuff() {
@@ -173,6 +230,8 @@ void Storage::SetPassphrase(string new_passphrase) {
 void Storage::Close()
 {
 	// This is where we could free a lock or something
+
+	valid = false;
 }
 
 void Storage::Save()
@@ -186,19 +245,26 @@ void Storage::Save()
 	rename(filename.c_str(), tmp_filename.c_str());
 
 	ofstream f(filename);
-	
-	try {
-		if (f.is_open()) {
-			f << json({ data, config });
+
+	bool SaveEncrypted = (passphrase != "");
+
+	if(SaveEncrypted) {
+		// Save encrypted
+
+		
+
+
+	} else {
+		// Save JSON unencrypted
+		try {
+			if (f.is_open()) {
+				f << json({ data, config });
+			}
+		}
+		catch( const exception & ex ) {
+			throw Exception(Exception::ERROR_SAVING_FILE);
 		}
 	}
-	catch( const exception & ex ) {
-		// TODO
-		cerr << ex.what() << endl;
-	}
-			//cout << j.dump(4) << endl;
-
-
 }
 /*
 	def save(self):
@@ -421,7 +487,7 @@ Storage::Exception::Exception(Storage::Exception::Err errCode) throw()
 	this->errCode = errCode;
 }
 
-Storage::Exception::Err Storage::Exception::getErrCode()
+Storage::Exception::Err Storage::Exception::getErrCode() const throw()
 {
 	return errCode;
 }
@@ -429,7 +495,6 @@ Storage::Exception::Err Storage::Exception::getErrCode()
 const char* Storage::Exception::what() const throw()
 {
 	switch(errCode) {
-		case CRYPTO_ERROR: return "Error with crypto functions.";
 		case FILE_ALREADY_EXISTS: return "File already exists.";
 		case NOT_IMPLEMENTED: return "Not implemented.";
 		case PATH_ALREADY_EXISTS: return "Path already exists.";
@@ -437,7 +502,12 @@ const char* Storage::Exception::what() const throw()
 		case MERGE_ERROR_DUPLICATE_PATH: return "Merge error: Duplicate path.";
 		case MERGE_ERROR_DUPLICATE_TIME: return "Merge error: Duplicate time.";
 		case MULTIPLE_INSTANCES_RUNNING: return "Mulitple instances running.";
-		
+		case CRYPTO_ERROR: return "Crypto error.";
+		case FILE_NOT_FOUND: return "File not found.";
+		case JSON_PARSE_ERROR: return "JSON parse error.";
+		case WRONG_PASSPHRASE: return "Wrong passphrase.";		
+		case ERROR_SAVING_FILE: return "Error saving file.";
+
 		default: return "???";
 	}
 }
