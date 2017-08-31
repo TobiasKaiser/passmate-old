@@ -49,7 +49,8 @@ class ScryptEncCtx : public ScryptEncDecCtx {
 			this->my_prng_ctx = my_prng_ctx;
 		}
 		int setup(const uint8_t * passwd, size_t passwdlen, size_t maxmem, double maxmemfrac, double maxtime);
-	
+		int encrypt(const uint8_t * inbuf, size_t inbuflen, uint8_t * outbuf, const uint8_t * passwd, size_t passwdlen, size_t maxmem, double maxmemfrac, double maxtime);
+
 	protected:
 		int pickparams(size_t maxmem, double maxmemfrac, double maxtime);
 };
@@ -62,6 +63,7 @@ class ScryptDecCtx : public ScryptEncDecCtx {
 
 		int setup(const uint8_t * passwd, size_t passwdlen, size_t maxmem, double maxmemfrac, double maxtime);
 
+		int decrypt(const uint8_t * inbuf, size_t inbuflen, uint8_t * outbuf, size_t * outlen, const uint8_t * passwd, size_t passwdlen, size_t maxmem, double maxmemfrac, double maxtime);
 	protected:
 		int checkparams(size_t maxmem, double maxmemfrac, double maxtime);
 		bool force;

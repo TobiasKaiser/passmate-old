@@ -37,6 +37,7 @@
 
 #include <mbedtls/sha256.h>
 #include <mbedtls/md.h>
+#include <mbedtls/aes.h>
 
 //#include "crypto_aes.h"
 //#include "crypto_aesctr.h"
@@ -55,8 +56,6 @@
 
 #define ENCBLOCK 65536
 
-static int pickparams(size_t, double, double, int *, uint32_t *, uint32_t *, int);
-static int checkparams(size_t, double, double, int, uint32_t, uint32_t, int, int);
 
 #define PRIu64 "lu"
 #define PRIu32 "u"
@@ -160,6 +159,9 @@ int ScryptDecCtx::checkparams(size_t maxmem, double maxmemfrac, double maxtime)
 	uint64_t N;
 	int rc;
 
+	memlimit = maxmem; // Maxmem has to be within the available system memory.
+
+
 	/* Sanity-check values. */
 	if ((logN < 1) || (logN > 63))
 		return (7);
@@ -213,7 +215,7 @@ int ScryptEncCtx::setup(const uint8_t * passwd, size_t passwdlen, size_t maxmem,
 	assert((logN > 0) && (logN < 256));
 
 	/* Get some salt. */
-	if(mbedtls_ctr_drbg_random(&my_prng_ctx, salt, 32))
+	if(mbedtls_ctr_drbg_random(my_prng_ctx, salt, 32))
 		return (4);
 
 	/* Generate the derived keys. */
@@ -224,8 +226,10 @@ int ScryptEncCtx::setup(const uint8_t * passwd, size_t passwdlen, size_t maxmem,
 	memcpy(header, "scrypt", 6);
 	header[6] = 0;
 	header[7] = logN & 0xff;
-	header[8] = htobe32(r);
-	header[12] = htobe32(p);
+	uint32_t r_be = htobe32(r);
+	memcpy(&header[8], &r_be, sizeof(uint32_t)); 
+	uint32_t p_be = htobe32(p);
+ 	memcpy(&header[12], &p_be, sizeof(uint32_t));
 	memcpy(&header[16], salt, 32);
 
 	/* Add header checksum. */
@@ -260,15 +264,14 @@ int ScryptDecCtx::setup(const uint8_t * passwd, size_t passwdlen, size_t maxmem,
 
 	/* Parse N, r, p, salt. */
 	logN = header[7];
-	r = be32dec(&header[8]);
-	p = be32dec(&header[12]);
+	r = be32toh(header[8]);
+	p = be32toh(header[12]);
 	memcpy(salt, &header[16], 32);
 
 	/* Verify header checksum. */
-	SHA256_Init(&ctx);
-	SHA256_Update(&ctx, header, 48);
-	SHA256_Final(hbuf, &ctx);
-	if (memcmp(&header[48], hbuf, 16))
+	mbedtls_sha256(header, 48, hbuf, 0);
+
+	if (memcmp(&header[48], hbuf, 16) != 0)
 		return (7);
 
 	/*
@@ -276,13 +279,11 @@ int ScryptDecCtx::setup(const uint8_t * passwd, size_t passwdlen, size_t maxmem,
 	 * key derivation function can be computed within the allowed memory
 	 * and CPU time, unless the user chose to disable this test.
 	 */
-	if ((rc = checkparams(maxmem, maxmemfrac, maxtime, logN, r, p,
-	    verbose, force)) != 0)
+	if ((rc = checkparams(maxmem, maxmemfrac, maxtime)) != 0)
 		return (rc);
 
 	/* Compute the derived keys. */
-	N = (uint64_t)(1) << logN;
-	if (crypto_scrypt(passwd, passwdlen, salt, 32, N, r, p, dk, 64))
+	if (libscrypt_scrypt(passwd, passwdlen, salt, 32, getN(), r, p, dk, 64))
 		return (3);
 
 	/* Check header signature (i.e., verify password). */
@@ -308,43 +309,60 @@ int ScryptDecCtx::setup(const uint8_t * passwd, size_t passwdlen, size_t maxmem,
  * Encrypt inbuflen bytes from inbuf, writing the resulting inbuflen + 128
  * bytes to outbuf.
  */
-int
-scryptenc_buf(const uint8_t * inbuf, size_t inbuflen, uint8_t * outbuf,
-    const uint8_t * passwd, size_t passwdlen,
-    size_t maxmem, double maxmemfrac, double maxtime, int verbose)
+int ScryptEncCtx::encrypt(const uint8_t * inbuf, size_t inbuflen, uint8_t * outbuf, const uint8_t * passwd, size_t passwdlen, size_t maxmem, double maxmemfrac, double maxtime)
 {
-	uint8_t dk[64];
-	uint8_t hbuf[32];
-	uint8_t header[96];
 	uint8_t * key_enc = dk;
 	uint8_t * key_hmac = &dk[32];
 	int rc;
-	HMAC_SHA256_CTX hctx;
-	struct crypto_aes_key * key_enc_exp;
-	struct crypto_aesctr * AES;
+	
+	uint8_t hbuf[32];
+	
+	//struct crypto_aes_key * key_enc_exp;
+	//struct crypto_aesctr * AES;
+	mbedtls_aes_context aes;
+
+	mbedtls_aes_init(&aes);
 
 	/* Generate the header and derived key. */
-	if ((rc = scryptenc_setup(header, dk, passwd, passwdlen,
-	    maxmem, maxmemfrac, maxtime, verbose)) != 0)
+	if ((rc = setup(passwd, passwdlen, maxmem, maxmemfrac, maxtime)) != 0)
 		return (rc);
 
 	/* Copy header into output buffer. */
 	memcpy(outbuf, header, 96);
 
 	/* Encrypt data. */
-	if ((key_enc_exp = crypto_aes_key_expand(key_enc, 32)) == NULL)
+	size_t nc_off=0;
+	unsigned char nonce_counter[16], stream_block[16];
+	memset(nonce_counter, 0, 16);
+	memset(stream_block, 0, 16);
+	if(mbedtls_aes_setkey_enc(&aes, key_enc, 32*8))
 		return (5);
-	if ((AES = crypto_aesctr_init(key_enc_exp, 0)) == NULL)
-		return (6);
-	crypto_aesctr_stream(AES, inbuf, &outbuf[96], inbuflen);
-	crypto_aesctr_free(AES);
-	crypto_aes_key_free(key_enc_exp);
+	mbedtls_aes_crypt_ctr(&aes, inbuflen, &nc_off, nonce_counter, stream_block, inbuf, &outbuf[96]);	
+
+	//if ((key_enc_exp = crypto_aes_key_expand(key_enc, 32)) == NULL)
+	//	return (5);
+	//if ((AES = crypto_aesctr_init(key_enc_exp, 0)) == NULL)
+	//	return (6);
+	//crypto_aesctr_stream(AES, inbuf, &outbuf[96], inbuflen);
+	//crypto_aesctr_free(AES);
+	//crypto_aes_key_free(key_enc_exp);
 
 	/* Add signature. */
+	mbedtls_md_context_t hctx;	
+	
+	mbedtls_md_init(&hctx);  
+	mbedtls_md_setup(&hctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 1);
+	mbedtls_md_hmac_starts(&hctx, key_hmac, 32);
+	mbedtls_md_hmac_update(&hctx, outbuf, 96 + inbuflen);    
+	mbedtls_md_hmac_finish(&hctx, hbuf);
+
 	memcpy(&outbuf[96 + inbuflen], hbuf, 32);
 
 	/* Zero sensitive data. */
-	insecure_memzero(dk, 64);
+	// TODO: think about zeroing
+	//insecure_memzero(dk, 64);
+
+	mbedtls_aes_free(&aes); // TODO: Make sure this always happens
 
 	/* Success! */
 	return (0);
@@ -358,20 +376,18 @@ scryptenc_buf(const uint8_t * inbuf, size_t inbuflen, uint8_t * outbuf,
  * be at least inbuflen.  If ${force} is 1, do not check whether
  * decryption will exceed the estimated available memory or time.
  */
-int
-scryptdec_buf(const uint8_t * inbuf, size_t inbuflen, uint8_t * outbuf,
-    size_t * outlen, const uint8_t * passwd, size_t passwdlen,
-    size_t maxmem, double maxmemfrac, double maxtime, int verbose,
-    int force)
+int ScryptDecCtx::decrypt(const uint8_t * inbuf, size_t inbuflen, uint8_t * outbuf, size_t * outlen, const uint8_t * passwd, size_t passwdlen, size_t maxmem, double maxmemfrac, double maxtime)
 {
 	uint8_t hbuf[32];
 	uint8_t dk[64];
 	uint8_t * key_enc = dk;
 	uint8_t * key_hmac = &dk[32];
 	int rc;
-	HMAC_SHA256_CTX hctx;
-	struct crypto_aes_key * key_enc_exp;
-	struct crypto_aesctr * AES;
+	
+	mbedtls_aes_context aes;
+
+	mbedtls_aes_init(&aes);
+
 
 	/*
 	 * All versions of the scrypt format will start with "scrypt" and
@@ -388,221 +404,46 @@ scryptdec_buf(const uint8_t * inbuf, size_t inbuflen, uint8_t * outbuf,
 	if (inbuflen < 128)
 		return (7);
 
+	memcpy(header, inbuf, 96);
+
 	/* Parse the header and generate derived keys. */
-	if ((rc = scryptdec_setup(inbuf, dk, passwd, passwdlen,
-	    maxmem, maxmemfrac, maxtime, verbose, force)) != 0)
+	if ((rc = setup(passwd, passwdlen, maxmem, maxmemfrac, maxtime)) != 0)
 		return (rc);
 
 	/* Decrypt data. */
-	if ((key_enc_exp = crypto_aes_key_expand(key_enc, 32)) == NULL)
+		size_t nc_off=0;
+	unsigned char nonce_counter[16], stream_block[16];
+	memset(nonce_counter, 0, 16);
+	memset(stream_block, 0, 16);
+	if(mbedtls_aes_setkey_enc(&aes, key_enc, 32*8))
 		return (5);
-	if ((AES = crypto_aesctr_init(key_enc_exp, 0)) == NULL)
-		return (6);
-	crypto_aesctr_stream(AES, &inbuf[96], outbuf, inbuflen - 128);
-	crypto_aesctr_free(AES);
-	crypto_aes_key_free(key_enc_exp);
-	*outlen = inbuflen - 128;
+	mbedtls_aes_crypt_ctr(&aes, inbuflen - 128, &nc_off, nonce_counter, stream_block, &inbuf[96], outbuf);	
+
+	//if ((key_enc_exp = crypto_aes_key_expand(key_enc, 32)) == NULL)
+	//	return (5);
+	//if ((AES = crypto_aesctr_init(key_enc_exp, 0)) == NULL)
+	//	return (6);
+	//crypto_aesctr_stream(AES, &inbuf[96], outbuf, inbuflen - 128);
+	//crypto_aesctr_free(AES);
+	//crypto_aes_key_free(key_enc_exp);
+	//*outlen = inbuflen - 128;
 
 	/* Verify signature. */
-	HMAC_SHA256_Init(&hctx, key_hmac, 32);
-	HMAC_SHA256_Update(&hctx, inbuf, inbuflen - 32);
-	HMAC_SHA256_Final(hbuf, &hctx);
+	mbedtls_md_context_t hctx;	
+	
+	mbedtls_md_init(&hctx);  
+	mbedtls_md_setup(&hctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 1);
+	mbedtls_md_hmac_starts(&hctx, key_hmac, 32);
+	mbedtls_md_hmac_update(&hctx, inbuf, inbuflen -32);    
+	mbedtls_md_hmac_finish(&hctx, hbuf);
+
 	if (memcmp(hbuf, &inbuf[inbuflen - 32], 32))
 		return (7);
 
 	/* Zero sensitive data. */
-	insecure_memzero(dk, 64);
+	// TODO:
+	//insecure_memzero(dk, 64);
 
 	/* Success! */
-	return (0);
-}
-
-/**
- * scryptenc_file(infile, outfile, passwd, passwdlen,
- *     maxmem, maxmemfrac, maxtime, verbose):
- * Read a stream from infile and encrypt it, writing the resulting stream to
- * outfile.
- */
-int
-scryptenc_file(FILE * infile, FILE * outfile,
-    const uint8_t * passwd, size_t passwdlen,
-    size_t maxmem, double maxmemfrac, double maxtime, int verbose)
-{
-	uint8_t buf[ENCBLOCK];
-	uint8_t dk[64];
-	uint8_t hbuf[32];
-	uint8_t header[96];
-	uint8_t * key_enc = dk;
-	uint8_t * key_hmac = &dk[32];
-	size_t readlen;
-	HMAC_SHA256_CTX hctx;
-	struct crypto_aes_key * key_enc_exp;
-	struct crypto_aesctr * AES;
-	int rc;
-
-	/* Generate the header and derived key. */
-	if ((rc = scryptenc_setup(header, dk, passwd, passwdlen,
-	    maxmem, maxmemfrac, maxtime, verbose)) != 0)
-		return (rc);
-
-	/* Hash and write the header. */
-	HMAC_SHA256_Init(&hctx, key_hmac, 32);
-	HMAC_SHA256_Update(&hctx, header, 96);
-	if (fwrite(header, 96, 1, outfile) != 1)
-		return (12);
-
-	/*
-	 * Read blocks of data, encrypt them, and write them out; hash the
-	 * data as it is produced.
-	 */
-	if ((key_enc_exp = crypto_aes_key_expand(key_enc, 32)) == NULL)
-		return (5);
-	if ((AES = crypto_aesctr_init(key_enc_exp, 0)) == NULL)
-		return (6);
-	do {
-		if ((readlen = fread(buf, 1, ENCBLOCK, infile)) == 0)
-			break;
-		crypto_aesctr_stream(AES, buf, buf, readlen);
-		HMAC_SHA256_Update(&hctx, buf, readlen);
-		if (fwrite(buf, 1, readlen, outfile) < readlen) {
-			crypto_aesctr_free(AES);
-			return (12);
-		}
-	} while (1);
-	crypto_aesctr_free(AES);
-	crypto_aes_key_free(key_enc_exp);
-
-	/* Did we exit the loop due to a read error? */
-	if (ferror(infile))
-		return (13);
-
-	/* Compute the final HMAC and output it. */
-	HMAC_SHA256_Final(hbuf, &hctx);
-	if (fwrite(hbuf, 32, 1, outfile) != 1)
-		return (12);
-
-	/* Zero sensitive data. */
-	insecure_memzero(dk, 64);
-
-	/* Success! */
-	return (0);
-}
-
-/**
- * scryptdec_file(infile, outfile, passwd, passwdlen,
- *     maxmem, maxmemfrac, maxtime, verbose, force):
- * Read a stream from infile and decrypt it, writing the resulting stream to
- * outfile.  If ${force} is 1, do not check whether decryption
- * will exceed the estimated available memory or time.
- */
-int
-scryptdec_file(FILE * infile, FILE * outfile,
-    const uint8_t * passwd, size_t passwdlen,
-    size_t maxmem, double maxmemfrac, double maxtime, int verbose,
-    int force)
-{
-	uint8_t buf[ENCBLOCK + 32];
-	uint8_t header[96];
-	uint8_t hbuf[32];
-	uint8_t dk[64];
-	uint8_t * key_enc = dk;
-	uint8_t * key_hmac = &dk[32];
-	size_t buflen = 0;
-	size_t readlen;
-	HMAC_SHA256_CTX hctx;
-	struct crypto_aes_key * key_enc_exp;
-	struct crypto_aesctr * AES;
-	int rc;
-
-	/*
-	 * Read the first 7 bytes of the file; all future versions of scrypt
-	 * are guaranteed to have at least 7 bytes of header.
-	 */
-	if (fread(header, 7, 1, infile) < 1) {
-		if (ferror(infile))
-			return (13);
-		else
-			return (7);
-	}
-
-	/* Do we have the right magic? */
-	if (memcmp(header, "scrypt", 6))
-		return (7);
-	if (header[6] != 0)
-		return (8);
-
-	/*
-	 * Read another 89 bytes of the file; version 0 of the scrypt file
-	 * format has a 96-byte header.
-	 */
-	if (fread(&header[7], 89, 1, infile) < 1) {
-		if (ferror(infile))
-			return (13);
-		else
-			return (7);
-	}
-
-	/* Parse the header and generate derived keys. */
-	if ((rc = scryptdec_setup(header, dk, passwd, passwdlen,
-	    maxmem, maxmemfrac, maxtime, verbose, force)) != 0)
-		return (rc);
-
-	/* Start hashing with the header. */
-	HMAC_SHA256_Init(&hctx, key_hmac, 32);
-	HMAC_SHA256_Update(&hctx, header, 96);
-
-	/*
-	 * We don't know how long the encrypted data block is (we can't know,
-	 * since data can be streamed into 'scrypt enc') so we need to read
-	 * data and decrypt all of it except the final 32 bytes, then check
-	 * if that final 32 bytes is the correct signature.
-	 */
-	if ((key_enc_exp = crypto_aes_key_expand(key_enc, 32)) == NULL)
-		return (5);
-	if ((AES = crypto_aesctr_init(key_enc_exp, 0)) == NULL)
-		return (6);
-	do {
-		/* Read data until we have more than 32 bytes of it. */
-		if ((readlen = fread(&buf[buflen], 1,
-		    ENCBLOCK + 32 - buflen, infile)) == 0)
-			break;
-		buflen += readlen;
-		if (buflen <= 32)
-			continue;
-
-		/*
-		 * Decrypt, hash, and output everything except the last 32
-		 * bytes out of what we have in our buffer.
-		 */
-		HMAC_SHA256_Update(&hctx, buf, buflen - 32);
-		crypto_aesctr_stream(AES, buf, buf, buflen - 32);
-		if (fwrite(buf, 1, buflen - 32, outfile) < buflen - 32) {
-			crypto_aesctr_free(AES);
-			return (12);
-		}
-
-		/* Move the last 32 bytes to the start of the buffer. */
-		memmove(buf, &buf[buflen - 32], 32);
-		buflen = 32;
-	} while (1);
-	crypto_aesctr_free(AES);
-	crypto_aes_key_free(key_enc_exp);
-
-	/* Did we exit the loop due to a read error? */
-	if (ferror(infile))
-		return (13);
-
-	/* Did we read enough data that we *might* have a valid signature? */
-	if (buflen < 32)
-		return (7);
-
-	/* Verify signature. */
-	HMAC_SHA256_Final(hbuf, &hctx);
-	if (memcmp(hbuf, buf, 32))
-		return (7);
-
-	/* Zero sensitive data. */
-	insecure_memzero(dk, 64);
-
 	return (0);
 }

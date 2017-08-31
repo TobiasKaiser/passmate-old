@@ -4,6 +4,7 @@
 #include <ctime>
 #include <cstdio>
 #include <string>
+#include "ScryptEnc.hpp"
 
 using json = nlohmann::json;
 using namespace std;
@@ -242,28 +243,42 @@ void Storage::Save()
 	cout << "saving!" << endl;
 
 	string tmp_filename = filename + ".prev";
-	rename(filename.c_str(), tmp_filename.c_str());
+	//rename(filename.c_str(), tmp_filename.c_str());
 
-	ofstream f(filename);
+	ofstream f(filename + ".TEST");
+
+	if(!f.good()) {
+		throw Exception(Exception::ERROR_SAVING_FILE);
+	}
 
 	bool SaveEncrypted = (passphrase != "");
 
 	if(SaveEncrypted) {
 		// Save encrypted
+		string json_str = json({ data, config }).dump();
+
+		vector<char> outbuf(json_str.length()+128);
+
+		ScryptEncCtx enc(&my_prng_ctx);
+		int rc;
+		rc=enc.encrypt((const uint8_t *) json_str.c_str(), json_str.length(), (uint8_t *) &outbuf[0], (const uint8_t *) passphrase.c_str(), passphrase.length(), 16*1024*1024, 0.5, 3.0);
+
+		cout << "encrypt rc: " << rc << endl;
+
+
+
+		f.write(&outbuf[0], outbuf.size());
 
 		
 
-
 	} else {
 		// Save JSON unencrypted
-		try {
-			if (f.is_open()) {
-				f << json({ data, config });
-			}
-		}
-		catch( const exception & ex ) {
-			throw Exception(Exception::ERROR_SAVING_FILE);
-		}
+		//try {
+			f << json({ data, config });
+		//}
+		//catch( const exception & ex ) {
+		//	throw Exception(Exception::ERROR_SAVING_FILE);
+		//}
 	}
 }
 /*
