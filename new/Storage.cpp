@@ -64,7 +64,31 @@ void Storage::Open(bool create, const string &passphrase) {
 		if(UnencryptedRequested) {
 			throw Exception(Exception::WRONG_PASSPHRASE);
 		}
-	
+
+		
+		stringstream rbuf_stream;
+		rbuf_stream << f.rdbuf();
+		string rbuf = rbuf_stream.str();
+
+		ScryptDecCtx dec(true);
+
+		if(rbuf.length()-128 < 0) {
+			throw Exception(Exception::CRYPTO_ERROR);	
+		}
+
+		vector<char> outbuf(rbuf.length()-128);
+		
+		int rc = dec.decrypt((const uint8_t *) rbuf.c_str(), rbuf.length(), (uint8_t *) &outbuf[0], NULL, (const uint8_t *) passphrase.c_str(), passphrase.length(), 16*1024*1024, 0.5, 6);
+
+		cout << "rc: " << rc << endl;
+
+		string rbuf_cleartext(outbuf.begin(),outbuf.end());
+
+		j = json::parse(rbuf_cleartext);
+		
+		data = j[0];
+		config = j[1];
+
 	} else {
 		// unencrypted file
 		if(!UnencryptedRequested) {
@@ -245,7 +269,7 @@ void Storage::Save()
 	string tmp_filename = filename + ".prev";
 	//rename(filename.c_str(), tmp_filename.c_str());
 
-	ofstream f(filename + ".TEST");
+	ofstream f(filename);
 
 	if(!f.good()) {
 		throw Exception(Exception::ERROR_SAVING_FILE);

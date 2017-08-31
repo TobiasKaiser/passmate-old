@@ -264,8 +264,12 @@ int ScryptDecCtx::setup(const uint8_t * passwd, size_t passwdlen, size_t maxmem,
 
 	/* Parse N, r, p, salt. */
 	logN = header[7];
-	r = be32toh(header[8]);
-	p = be32toh(header[12]);
+	uint32_t r_be;
+	memcpy(&r_be, &header[8], sizeof(uint32_t));
+	r = be32toh(r_be);
+	uint32_t p_be;
+	memcpy(&p_be, &header[12], sizeof(uint32_t));
+	p = be32toh(p_be);
 	memcpy(salt, &header[16], 32);
 
 	/* Verify header checksum. */
@@ -379,7 +383,7 @@ int ScryptEncCtx::encrypt(const uint8_t * inbuf, size_t inbuflen, uint8_t * outb
 int ScryptDecCtx::decrypt(const uint8_t * inbuf, size_t inbuflen, uint8_t * outbuf, size_t * outlen, const uint8_t * passwd, size_t passwdlen, size_t maxmem, double maxmemfrac, double maxtime)
 {
 	uint8_t hbuf[32];
-	uint8_t dk[64];
+	//uint8_t dk[64];
 	uint8_t * key_enc = dk;
 	uint8_t * key_hmac = &dk[32];
 	int rc;
@@ -411,7 +415,8 @@ int ScryptDecCtx::decrypt(const uint8_t * inbuf, size_t inbuflen, uint8_t * outb
 		return (rc);
 
 	/* Decrypt data. */
-		size_t nc_off=0;
+	
+	size_t nc_off=0;
 	unsigned char nonce_counter[16], stream_block[16];
 	memset(nonce_counter, 0, 16);
 	memset(stream_block, 0, 16);
@@ -426,6 +431,8 @@ int ScryptDecCtx::decrypt(const uint8_t * inbuf, size_t inbuflen, uint8_t * outb
 	//crypto_aesctr_stream(AES, &inbuf[96], outbuf, inbuflen - 128);
 	//crypto_aesctr_free(AES);
 	//crypto_aes_key_free(key_enc_exp);
+	
+
 	//*outlen = inbuflen - 128;
 
 	/* Verify signature. */
