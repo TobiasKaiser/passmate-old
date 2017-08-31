@@ -1,3 +1,0 @@
-[submodule "new/scrypt"]
-	path = new/scrypt
-	url = https://github.com/Tarsnap/scrypt.git
