@@ -29,12 +29,14 @@ bool Application::OnInit() {
     //}
 
 
-	cxxopts::Options options("passmate", "Password manager");
+	cxxopts::Options options("passmate", "passmate -- Password manager");
 	options.positional_help("[optional args]");
 
 	options.add_options()
   		//("d,debug", "Enable debugging")
   		("h,help" , "Print help")
+  		("dry-run", "Do not commit any changes to storage")
+  		("p,paranoid-backup", "Create a backup of storage file every time it changes")
   		("f,storage-filename", "Storage filename", cxxopts::value<std::string>());
 
 
@@ -43,18 +45,25 @@ bool Application::OnInit() {
 	try {
 		options.parse(argc, myArgv);
 	} catch (const cxxopts::OptionException& e) {
-
-		std::cout << "error parsing options: " << e.what() << std::endl;
+		cout << "error parsing options: " << e.what() << std::endl;
 		return false;
 	}
 
 	if (options.count("help")) {
-		std::cout << options.help({"", "Group"}) << std::endl;
-		exit(0);
+		cout << options.help({"", "Group"}) << std::endl;
+		return false;
+	}
+
+	if(options.count("dry-run")) {
+ 		// TODO
+	}
+
+	if(options.count("paranoid-backup")) {
+		// TODO
 	}
 
 	
-	if(options.count("f")) {
+	if(options.count("storage-filename")) {
 		storage_filename = options["f"].as<string>();
 	} else {
 	

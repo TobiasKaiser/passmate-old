@@ -75,12 +75,15 @@ class Storage {
 
 				Exception(enum Err errCode) throw();
 
+				Exception(enum Err errCode, std::string explaination) throw();
+
 				Err getErrCode() const throw();
 
 
 				const char* what() const throw();
 			private:
 				enum Err errCode;
+				std::string explaination;
 		};
 
 		bool IsValid() { return valid; }

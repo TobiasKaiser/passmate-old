@@ -50,11 +50,12 @@ class ScryptEncCtx : public ScryptEncDecCtx {
 		ScryptEncCtx(mbedtls_ctr_drbg_context *my_prng_ctx) : ScryptEncDecCtx() {
 			this->my_prng_ctx = my_prng_ctx;
 		}
-		int setup(const uint8_t * passwd, size_t passwdlen, size_t maxmem, double maxmemfrac, double maxtime);
-		int encrypt(const uint8_t * inbuf, size_t inbuflen, uint8_t * outbuf, const uint8_t * passwd, size_t passwdlen, size_t maxmem, double maxmemfrac, double maxtime);
+		void encrypt(const uint8_t * inbuf, size_t inbuflen, uint8_t * outbuf, const uint8_t * passwd, size_t passwdlen, size_t maxmem, double maxmemfrac, double maxtime);
 
 	protected:
-		int pickparams(size_t maxmem, double maxmemfrac, double maxtime);
+		void setup(const uint8_t * passwd, size_t passwdlen, size_t maxmem, double maxmemfrac, double maxtime);
+		
+		int pickparams(size_t maxmem, double maxmemfrac, double maxtime); // pickparams and checkparams use C-style return code error handling, everything else in Ctx C++ exceptions.
 };
 
 class ScryptDecCtx : public ScryptEncDecCtx {
@@ -63,11 +64,12 @@ class ScryptDecCtx : public ScryptEncDecCtx {
 			this->force = force;
 		}
 
-		int setup(const uint8_t * passwd, size_t passwdlen, size_t maxmem, double maxmemfrac, double maxtime);
+		void decrypt(const uint8_t * inbuf, size_t inbuflen, uint8_t * outbuf, size_t * outlen, const uint8_t * passwd, size_t passwdlen, size_t maxmem, double maxmemfrac, double maxtime);
 
-		int decrypt(const uint8_t * inbuf, size_t inbuflen, uint8_t * outbuf, size_t * outlen, const uint8_t * passwd, size_t passwdlen, size_t maxmem, double maxmemfrac, double maxtime);
 	protected:
-		int checkparams(size_t maxmem, double maxmemfrac, double maxtime);
+		void setup(const uint8_t * passwd, size_t passwdlen, size_t maxmem, double maxmemfrac, double maxtime);
+		
+		int checkparams(size_t maxmem, double maxmemfrac, double maxtime); // pickparams and checkparams use C-style return code error handling, everything else in Ctx C++ exceptions.
 		bool force;
 };
 

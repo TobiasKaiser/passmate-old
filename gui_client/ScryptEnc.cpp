@@ -52,6 +52,8 @@
 //#include "memlimit.h"
 //#include "scryptenc_cpuperf.h"
 
+#include "Storage.hpp"
+
 #include "ScryptEnc.hpp"
 
 #define ENCBLOCK 65536
@@ -227,9 +229,7 @@ void ScryptEncDecCtx::CalcOpsPerSec()
 {
 	int rc;
 	if ((rc = scryptenc_cpuperf(&opps)) != 0) {
-		//return (rc);
-		printf("TODO.......\n");
-		exit(1);
+		throw Storage::Exception(Storage::Exception::CRYPTO_ERROR, "Failed to determine scrypt ops per second.");
 	}
 }
 
@@ -340,29 +340,31 @@ int ScryptDecCtx::checkparams(size_t maxmem, double maxmemfrac, double maxtime)
 	return (0);
 }
 
-int ScryptEncCtx::setup(const uint8_t * passwd, size_t passwdlen, size_t maxmem, double maxmemfrac, double maxtime)
+void ScryptEncCtx::setup(const uint8_t * passwd, size_t passwdlen, size_t maxmem, double maxmemfrac, double maxtime)
 {
 	uint8_t salt[32];
 	uint8_t hbuf[32];
-	//SHA256_CTX ctx;
 	uint8_t * key_hmac = &dk[32];
 	
 	int rc;
 
 	/* Pick values for N, r, p. */
-	if ((rc = pickparams(maxmem, maxmemfrac, maxtime)) != 0)
-		return (rc);
+	if ((rc = pickparams(maxmem, maxmemfrac, maxtime)) != 0) {
+		throw Storage::Exception(Storage::Exception::CRYPTO_ERROR, "Failed to pick scrypt parameters");
+	}
 
 	/* Sanity check. */
 	assert((logN > 0) && (logN < 256));
 
 	/* Get some salt. */
-	if(mbedtls_ctr_drbg_random(my_prng_ctx, salt, 32))
-		return (4);
+	if(mbedtls_ctr_drbg_random(my_prng_ctx, salt, 32)) {
+		throw Storage::Exception(Storage::Exception::CRYPTO_ERROR, "Failed to obtain seed");
+	}
 
 	/* Generate the derived keys. */
-	if (libscrypt_scrypt(passwd, passwdlen, salt, 32, getN(), r, p, dk, 64))
-		return (3);
+	if (libscrypt_scrypt(passwd, passwdlen, salt, 32, getN(), r, p, dk, 64)) {
+		throw Storage::Exception(Storage::Exception::CRYPTO_ERROR, "Abnormal scrypt return code");
+	}
 
 	/* Construct the file header. */
 	memcpy(header, "scrypt", 6);
@@ -376,9 +378,6 @@ int ScryptEncCtx::setup(const uint8_t * passwd, size_t passwdlen, size_t maxmem,
 
 	/* Add header checksum. */
 	mbedtls_sha256(header, 48, hbuf, 0);	
-	//SHA256_Init(&ctx);
-	//SHA256_Update(&ctx, header, 48);
-	//SHA256_Final(hbuf, &ctx);
 	memcpy(&header[48], hbuf, 16);
 
 	/* Add header signature (used for verifying password). */
@@ -391,12 +390,9 @@ int ScryptEncCtx::setup(const uint8_t * passwd, size_t passwdlen, size_t maxmem,
 	mbedtls_md_hmac_finish(&hctx, hbuf);
 
 	memcpy(&header[64], hbuf, 32);
-
-	/* Success! */
-	return (0);
 }
 
-int ScryptDecCtx::setup(const uint8_t * passwd, size_t passwdlen, size_t maxmem, double maxmemfrac, double maxtime)
+void ScryptDecCtx::setup(const uint8_t * passwd, size_t passwdlen, size_t maxmem, double maxmemfrac, double maxtime)
 {
 	uint8_t salt[32];
 	uint8_t hbuf[32];
@@ -417,20 +413,23 @@ int ScryptDecCtx::setup(const uint8_t * passwd, size_t passwdlen, size_t maxmem,
 	/* Verify header checksum. */
 	mbedtls_sha256(header, 48, hbuf, 0);
 
-	if (memcmp(&header[48], hbuf, 16) != 0)
-		return (7);
+	if (memcmp(&header[48], hbuf, 16) != 0) {
+		throw Storage::Exception(Storage::Exception::CRYPTO_ERROR, "Invalid header checksum");
+	}
 
 	/*
 	 * Check whether the provided parameters are valid and whether the
 	 * key derivation function can be computed within the allowed memory
 	 * and CPU time, unless the user chose to disable this test.
 	 */
-	if ((rc = checkparams(maxmem, maxmemfrac, maxtime)) != 0)
-		return (rc);
+	if ((rc = checkparams(maxmem, maxmemfrac, maxtime)) != 0) {
+		throw Storage::Exception(Storage::Exception::CRYPTO_ERROR, "System has too little resources to decrypt input");
+	}
 
 	/* Compute the derived keys. */
-	if (libscrypt_scrypt(passwd, passwdlen, salt, 32, getN(), r, p, dk, 64))
-		return (3);
+	if (libscrypt_scrypt(passwd, passwdlen, salt, 32, getN(), r, p, dk, 64)) {
+		throw Storage::Exception(Storage::Exception::CRYPTO_ERROR, "Abnormal scrypt return code");
+	}
 
 	/* Check header signature (i.e., verify password). */
 
@@ -442,11 +441,10 @@ int ScryptDecCtx::setup(const uint8_t * passwd, size_t passwdlen, size_t maxmem,
 	mbedtls_md_hmac_update(&hctx, header, 64);    
 	mbedtls_md_hmac_finish(&hctx, hbuf);
 
-	if (memcmp(hbuf, &header[64], 32))
-		return (11);
-
-	/* Success! */
-	return (0);
+	if (memcmp(hbuf, &header[64], 32)) {
+		//throw Storage::Exception(Storage::Exception::CRYPTO_ERROR, "Invalid header HMAC");
+		throw Storage::Exception(Storage::Exception::WRONG_PASSPHRASE);
+	}
 }
 
 /**
@@ -455,43 +453,33 @@ int ScryptDecCtx::setup(const uint8_t * passwd, size_t passwdlen, size_t maxmem,
  * Encrypt inbuflen bytes from inbuf, writing the resulting inbuflen + 128
  * bytes to outbuf.
  */
-int ScryptEncCtx::encrypt(const uint8_t * inbuf, size_t inbuflen, uint8_t * outbuf, const uint8_t * passwd, size_t passwdlen, size_t maxmem, double maxmemfrac, double maxtime)
+void ScryptEncCtx::encrypt(const uint8_t * inbuf, size_t inbuflen, uint8_t * outbuf, const uint8_t * passwd, size_t passwdlen, size_t maxmem, double maxmemfrac, double maxtime)
 {
 	uint8_t * key_enc = dk;
 	uint8_t * key_hmac = &dk[32];
-	int rc;
 	
 	uint8_t hbuf[32];
 	
-	//struct crypto_aes_key * key_enc_exp;
-	//struct crypto_aesctr * AES;
-	mbedtls_aes_context aes;
-
-	mbedtls_aes_init(&aes);
-
-	/* Generate the header and derived key. */
-	if ((rc = setup(passwd, passwdlen, maxmem, maxmemfrac, maxtime)) != 0)
-		return (rc);
-
+	setup(passwd, passwdlen, maxmem, maxmemfrac, maxtime);
+		
 	/* Copy header into output buffer. */
 	memcpy(outbuf, header, 96);
-
+	
 	/* Encrypt data. */
+	mbedtls_aes_context aes;
+
 	size_t nc_off=0;
 	unsigned char nonce_counter[16], stream_block[16];
 	memset(nonce_counter, 0, 16);
 	memset(stream_block, 0, 16);
-	if(mbedtls_aes_setkey_enc(&aes, key_enc, 32*8))
-		return (5);
+	mbedtls_aes_init(&aes);
+	if(mbedtls_aes_setkey_enc(&aes, key_enc, 32*8)) {
+		mbedtls_aes_free(&aes);		
+		throw Storage::Exception(Storage::Exception::CRYPTO_ERROR, "Failed to set AES key");
+		
+	}
 	mbedtls_aes_crypt_ctr(&aes, inbuflen, &nc_off, nonce_counter, stream_block, inbuf, &outbuf[96]);	
-
-	//if ((key_enc_exp = crypto_aes_key_expand(key_enc, 32)) == NULL)
-	//	return (5);
-	//if ((AES = crypto_aesctr_init(key_enc_exp, 0)) == NULL)
-	//	return (6);
-	//crypto_aesctr_stream(AES, inbuf, &outbuf[96], inbuflen);
-	//crypto_aesctr_free(AES);
-	//crypto_aes_key_free(key_enc_exp);
+	mbedtls_aes_free(&aes);
 
 	/* Add signature. */
 	mbedtls_md_context_t hctx;	
@@ -501,17 +489,13 @@ int ScryptEncCtx::encrypt(const uint8_t * inbuf, size_t inbuflen, uint8_t * outb
 	mbedtls_md_hmac_starts(&hctx, key_hmac, 32);
 	mbedtls_md_hmac_update(&hctx, outbuf, 96 + inbuflen);    
 	mbedtls_md_hmac_finish(&hctx, hbuf);
+	mbedtls_md_free(&hctx);
 
 	memcpy(&outbuf[96 + inbuflen], hbuf, 32);
 
 	/* Zero sensitive data. */
 	// TODO: think about zeroing
 	//insecure_memzero(dk, 64);
-
-	mbedtls_aes_free(&aes); // TODO: Make sure this always happens
-
-	/* Success! */
-	return (0);
 }
 
 /**
@@ -522,58 +506,50 @@ int ScryptEncCtx::encrypt(const uint8_t * inbuf, size_t inbuflen, uint8_t * outb
  * be at least inbuflen.  If ${force} is 1, do not check whether
  * decryption will exceed the estimated available memory or time.
  */
-int ScryptDecCtx::decrypt(const uint8_t * inbuf, size_t inbuflen, uint8_t * outbuf, size_t * outlen, const uint8_t * passwd, size_t passwdlen, size_t maxmem, double maxmemfrac, double maxtime)
+void ScryptDecCtx::decrypt(const uint8_t * inbuf, size_t inbuflen, uint8_t * outbuf, size_t * outlen, const uint8_t * passwd, size_t passwdlen, size_t maxmem, double maxmemfrac, double maxtime)
 {
 	uint8_t hbuf[32];
 	//uint8_t dk[64];
 	uint8_t * key_enc = dk;
 	uint8_t * key_hmac = &dk[32];
-	int rc;
-	
-	mbedtls_aes_context aes;
-
-	mbedtls_aes_init(&aes);
-
 
 	/*
 	 * All versions of the scrypt format will start with "scrypt" and
 	 * have at least 7 bytes of header.
 	 */
-	if ((inbuflen < 7) || (memcmp(inbuf, "scrypt", 6) != 0))
-		return (7);
+	if ((inbuflen < 7) || (memcmp(inbuf, "scrypt", 6) != 0)) {
+		throw Storage::Exception(Storage::Exception::CRYPTO_ERROR, "Input is not scrypt file");
+	}
 
 	/* Check the format. */
-	if (inbuf[6] != 0)
-		return (8);
+	if (inbuf[6] != 0) {
+		throw Storage::Exception(Storage::Exception::CRYPTO_ERROR, "Incorrect scrypt file version");
+	}
 
 	/* We must have at least 128 bytes. */
-	if (inbuflen < 128)
-		return (7);
+	if (inbuflen < 128) {
+		throw Storage::Exception(Storage::Exception::CRYPTO_ERROR, "Invalid input length");
+	}
 
 	memcpy(header, inbuf, 96);
 
 	/* Parse the header and generate derived keys. */
-	if ((rc = setup(passwd, passwdlen, maxmem, maxmemfrac, maxtime)) != 0)
-		return (rc);
+	setup(passwd, passwdlen, maxmem, maxmemfrac, maxtime);
 
 	/* Decrypt data. */
-	
+	mbedtls_aes_context aes;
+
+	mbedtls_aes_init(&aes);
 	size_t nc_off=0;
 	unsigned char nonce_counter[16], stream_block[16];
 	memset(nonce_counter, 0, 16);
 	memset(stream_block, 0, 16);
-	if(mbedtls_aes_setkey_enc(&aes, key_enc, 32*8))
-		return (5);
-	mbedtls_aes_crypt_ctr(&aes, inbuflen - 128, &nc_off, nonce_counter, stream_block, &inbuf[96], outbuf);	
-
-	//if ((key_enc_exp = crypto_aes_key_expand(key_enc, 32)) == NULL)
-	//	return (5);
-	//if ((AES = crypto_aesctr_init(key_enc_exp, 0)) == NULL)
-	//	return (6);
-	//crypto_aesctr_stream(AES, &inbuf[96], outbuf, inbuflen - 128);
-	//crypto_aesctr_free(AES);
-	//crypto_aes_key_free(key_enc_exp);
-	
+	if(mbedtls_aes_setkey_enc(&aes, key_enc, 32*8)) {
+		mbedtls_aes_free(&aes);
+		throw Storage::Exception(Storage::Exception::CRYPTO_ERROR, "Failed to set AES key");
+	}
+	mbedtls_aes_crypt_ctr(&aes, inbuflen - 128, &nc_off, nonce_counter, stream_block, &inbuf[96], outbuf);
+	mbedtls_aes_free(&aes);
 
 	//*outlen = inbuflen - 128;
 
@@ -585,14 +561,13 @@ int ScryptDecCtx::decrypt(const uint8_t * inbuf, size_t inbuflen, uint8_t * outb
 	mbedtls_md_hmac_starts(&hctx, key_hmac, 32);
 	mbedtls_md_hmac_update(&hctx, inbuf, inbuflen -32);    
 	mbedtls_md_hmac_finish(&hctx, hbuf);
+	mbedtls_md_free(&hctx);
 
-	if (memcmp(hbuf, &inbuf[inbuflen - 32], 32))
-		return (7);
+	if (memcmp(hbuf, &inbuf[inbuflen - 32], 32)) {
+		throw Storage::Exception(Storage::Exception::CRYPTO_ERROR, "Invalid overall HMAC");			
+	}
 
 	/* Zero sensitive data. */
 	// TODO:
 	//insecure_memzero(dk, 64);
-
-	/* Success! */
-	return (0);
 }

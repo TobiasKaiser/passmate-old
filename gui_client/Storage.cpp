@@ -83,9 +83,8 @@ void Storage::Open(bool create, const string &passphrase) {
 
 		vector<char> outbuf(rbuf.length()-128);
 		
-		int rc = dec.decrypt((const uint8_t *) rbuf.c_str(), rbuf.length(), (uint8_t *) &outbuf[0], NULL, (const uint8_t *) passphrase.c_str(), passphrase.length(), 16*1024*1024, 0.5, 6);
-
-		cout << "rc: " << rc << endl;
+		// This throws an Storage::Exception in many cases.		
+		dec.decrypt((const uint8_t *) rbuf.c_str(), rbuf.length(), (uint8_t *) &outbuf[0], NULL, (const uint8_t *) passphrase.c_str(), passphrase.length(), 16*1024*1024, 0.5, 6);
 
 		string rbuf_cleartext(outbuf.begin(),outbuf.end());
 
@@ -308,10 +307,9 @@ void Storage::Save()
 		vector<char> outbuf(json_str.length()+128);
 
 		ScryptEncCtx enc(&my_prng_ctx);
-		int rc;
-		rc=enc.encrypt((const uint8_t *) json_str.c_str(), json_str.length(), (uint8_t *) &outbuf[0], (const uint8_t *) passphrase.c_str(), passphrase.length(), 16*1024*1024, 0.5, 3.0);
 
-		cout << "encrypt rc: " << rc << endl;
+		// This will throw a Storage:Exception in case something goes wrong		
+		enc.encrypt((const uint8_t *) json_str.c_str(), json_str.length(), (uint8_t *) &outbuf[0], (const uint8_t *) passphrase.c_str(), passphrase.length(), 16*1024*1024, 0.5, 3.0);
 
 		f.write(&outbuf[0], outbuf.size());
 
@@ -528,6 +526,13 @@ void Storage::RecordUnset(string const &path, string const &key)
 Storage::Exception::Exception(Storage::Exception::Err errCode) throw()
 {
 	this->errCode = errCode;
+	this->explaination = "";
+}
+
+Storage::Exception::Exception(Storage::Exception::Err errCode, std::string explaination) throw()
+{
+	this->errCode = errCode;
+	this->explaination = explaination;
 }
 
 Storage::Exception::Err Storage::Exception::getErrCode() const throw()

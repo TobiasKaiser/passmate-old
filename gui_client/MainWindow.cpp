@@ -488,7 +488,9 @@ void MainWindow::OnHelp(wxCommandEvent &evt) {
 
 
 void MainWindow::OnQuit(wxCommandEvent &evt) {
-    cout << "quit" << endl;
+    // menu
+
+    Close(true);
 }
 
 void MainWindow::OnClose(wxCommandEvent& WXUNUSED(event))
@@ -504,13 +506,17 @@ void MainWindow::OnButtonAddRecord(wxCommandEvent &evt)
 
     wxTextEntryDialog recordNameDialog(this, wxT("New record name:"));
     if (recordNameDialog.ShowModal() == wxID_OK) {
+        string path(recordNameDialog.GetValue());
 
-        cout << "Name:" << recordNameDialog.GetValue() << endl;
 
-        st.NewRecord(string(recordNameDialog.GetValue()));
+        st.NewRecord(path);
         st.Save();
 
+        SwitchToRecord(path);
+
         UpdateRecordTree();
+ 
+        recordTree->SelectItem(irt_root.FindByPath(path)->item_id);
     }
 
 }
@@ -523,9 +529,7 @@ void MainWindow::OnButtonSync(wxCommandEvent &evt)
 void MainWindow::OnButtonRemove(wxCommandEvent &evt)
 {
     if(!cur_record.IsValid()) {
-        cout << "x" << endl;
         return;
-
     }
 
     Storage &st = wxGetApp().GetStorage();
@@ -546,7 +550,6 @@ void MainWindow::OnButtonRemove(wxCommandEvent &evt)
 void MainWindow::OnButtonRename(wxCommandEvent &evt)
 {
     if(!cur_record.IsValid()) {
-        cout << "x" << endl;
         return;
     }
 
@@ -676,13 +679,12 @@ void MainWindow::OnFieldGenerate(wxCommandEvent &evt)
     FieldButtonUserData *ud = (FieldButtonUserData *) evt.GetEventUserData();
     cout << "Field generate " << ud->GetFieldName() << ", " << ud->GetValueIdx() << endl;
 
+    // TODO
 }
 
 void MainWindow::OnFieldMaskUnmask(wxCommandEvent &evt)
 {
     FieldButtonUserData *ud = (FieldButtonUserData *) evt.GetEventUserData();
-    cout << "Field mask unmask " << ud->GetFieldName() << ", " << ud->GetValueIdx() << endl;
-
 
     wxTextCtrl *entry = cur_record_text_ctrls[ud->GetFieldName()][ud->GetValueIdx()];
 
@@ -703,8 +705,7 @@ void MainWindow::OnFieldMaskUnmask(wxCommandEvent &evt)
 void MainWindow::OnFieldClip(wxCommandEvent &evt)
 {
     FieldButtonUserData *ud = (FieldButtonUserData *) evt.GetEventUserData();
-    cout << "Field clip " << ud->GetFieldName() << ", " << ud->GetValueIdx() << endl;
-
+    
     wxTextCtrl *entry = cur_record_text_ctrls[ud->GetFieldName()][ud->GetValueIdx()];
 
     //wxClipboard clipboard = wxClipboard();
@@ -719,8 +720,7 @@ void MainWindow::OnFieldClip(wxCommandEvent &evt)
 void MainWindow::OnFieldRemove(wxCommandEvent &evt)
 {
     FieldButtonUserData *ud = (FieldButtonUserData *) evt.GetEventUserData();
-    cout << "Field remove " << ud->GetFieldName() << ", " << ud->GetValueIdx() << endl;
-
+    
     vector<wxTextCtrl *> allValueEntries = cur_record_text_ctrls[ud->GetFieldName()];
 
     for(const auto &entry : allValueEntries) {
