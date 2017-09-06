@@ -5,6 +5,8 @@
 #include <mbedtls/ctr_drbg.h>
 
 
+int scryptenc_cpuperf(double * opps);
+
 // "abstract" class - only useful as either ScryptEncCtx or ScryptDecCtx
 class ScryptEncDecCtx {
 	public:
