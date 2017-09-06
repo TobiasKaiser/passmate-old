@@ -52,7 +52,7 @@ MainWindow::MainWindow()
     //wxButton *buttonHistory=new wxButton(panelRight, wxID_ANY, _T("History"));
 
     buttonAdd->Bind(wxEVT_BUTTON, &MainWindow::OnButtonAddRecord, this);
-    buttonSync->Bind(wxEVT_BUTTON, &MainWindow::OnButtonSync, this);
+    buttonSync->Bind(wxEVT_BUTTON, &MainWindow::OnSync, this);
     buttonRemove->Bind(wxEVT_BUTTON, &MainWindow::OnButtonRemove, this);
     buttonRename->Bind(wxEVT_BUTTON, &MainWindow::OnButtonRename, this);
     buttonAddField->Bind(wxEVT_BUTTON, &MainWindow::OnButtonAddField, this);
@@ -145,10 +145,50 @@ MainWindow::MainWindow()
 
     Connect( wxEVT_SIZE, wxSizeEventHandler( MainWindow::OnSize ) );
 
-
-
     //panelRecord->ShowScrollbars(wxSHOW_SB_ALWAYS, wxSHOW_SB_ALWAYS);
 }
+
+void MainWindow::InitMenu()
+{
+    // Setup menu
+    wxMenuBar *menubar = new wxMenuBar();
+    wxMenu *menuStore, *menuSync, *menuHelp;
+    menuStore = new wxMenu();
+    menuSync = new wxMenu();
+    menuHelp = new wxMenu();
+    menuIdChangePass = menuStore->Append(wxID_ANY, wxT("Change &Passphrase"))->GetId();
+    menuStore->Append(wxID_EXIT, wxT("&Quit"));
+
+
+    menuIdDoc = menuHelp->Append(wxID_ANY, wxT("&Documentation"))->GetId();
+    menuIdHelp = menuHelp->Append(wxID_ANY, wxT("Visit &Website"))->GetId();
+
+    menuIdSync =                    menuSync->Append(wxID_ANY, wxT("&Sync now"))->GetId();
+    menuIdSyncSetup =               menuSync->Append(wxID_ANY, wxT("&Connection to existing account"))->GetId();
+    menuIdSyncSetupNewAccount =     menuSync->Append(wxID_ANY, wxT("Create &new account"))->GetId();
+    menuIdSyncDeleteFromServer =    menuSync->Append(wxID_ANY, wxT("D&elete account"))->GetId();
+    menuIdSyncReset =               menuSync->Append(wxID_ANY, wxT("&Disconnect from account"))->GetId();
+    menuIdSyncShowKey =             menuSync->Append(wxID_ANY, wxT("Show sync &key"))->GetId();
+
+    menubar->Append(menuStore, wxT("&Store"));
+    menubar->Append(menuSync, wxT("S&ync"));
+    menubar->Append(menuHelp, wxT("&Help"));
+
+    Connect(wxID_EXIT, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(MainWindow::OnQuit));
+    Connect(menuIdChangePass, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(MainWindow::OnChangePass));
+    Connect(menuIdDoc, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(MainWindow::OnDoc));
+    Connect(menuIdHelp, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(MainWindow::OnHelp));
+
+    Connect(menuIdSync,                 wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(MainWindow::OnSync));
+    Connect(menuIdSyncSetup,            wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(MainWindow::OnSyncSetup));
+    Connect(menuIdSyncSetupNewAccount,  wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(MainWindow::OnSyncSetupNewAccount));
+    Connect(menuIdSyncDeleteFromServer, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(MainWindow::OnSyncDeleteFromServer));
+    Connect(menuIdSyncReset,            wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(MainWindow::OnSyncReset));
+    Connect(menuIdSyncShowKey,          wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(MainWindow::OnSyncShowKey));
+    
+    SetMenuBar(menubar);
+}
+
 
 void MainWindow::SwitchToRecord(std::string path)
 {
@@ -381,34 +421,6 @@ void MainWindow::addFieldToPanel(std::string key, std::vector<std::string> value
     }
 }
 
-void MainWindow::InitMenu()
-{
-    // Setup menu
-    wxMenuBar *menubar = new wxMenuBar();
-    wxMenu *menuStore, *menuSync, *menuHelp;
-    menuStore = new wxMenu();
-    menuSync = new wxMenu();
-    menuHelp = new wxMenu();
-    menuIdChangePass = menuStore->Append(wxID_ANY, wxT("Change &Passphrase"))->GetId();
-    menuStore->Append(wxID_EXIT, wxT("&Quit"));
-
-
-    menuIdDoc = menuHelp->Append(wxID_ANY, wxT("&Documentation"))->GetId();
-    menuIdHelp = menuHelp->Append(wxID_ANY, wxT("Visit &Website"))->GetId();
-    menuIdSync = menuSync->Append(wxID_ANY, wxT("&Sync now"))->GetId();
-
-    menubar->Append(menuStore, wxT("&Store"));
-    menubar->Append(menuSync, wxT("S&ync"));
-    menubar->Append(menuHelp, wxT("&Help"));
-
-    Bind(wxEVT_COMMAND_MENU_SELECTED, &MainWindow::OnQuit, this, wxID_EXIT);
-    Bind(wxEVT_COMMAND_MENU_SELECTED, &MainWindow::OnChangePass, this, menuIdChangePass);
-    Bind(wxEVT_COMMAND_MENU_SELECTED, &MainWindow::OnDoc, this, menuIdDoc);
-    Bind(wxEVT_COMMAND_MENU_SELECTED, &MainWindow::OnHelp, this, menuIdHelp);
-
-    SetMenuBar(menubar);
-}
-
 void MainWindow::ShowCommitBar(bool enable)
 {
     changesPending=enable;
@@ -518,12 +530,6 @@ void MainWindow::OnButtonAddRecord(wxCommandEvent &evt)
  
         recordTree->SelectItem(irt_root.FindByPath(path)->item_id);
     }
-
-}
-
-void MainWindow::OnButtonSync(wxCommandEvent &evt)
-{
-    cout << "sync not implemented yet" << endl;
 }
 
 void MainWindow::OnButtonRemove(wxCommandEvent &evt)
@@ -735,6 +741,46 @@ void MainWindow::OnSize(wxSizeEvent& event)
 {
     Layout();
 }
+
+
+
+// This is both the always-on button and the selectively enabled menu entry
+void MainWindow::OnSync(wxCommandEvent &evt)
+{
+    SyncableStorage &st = wxGetApp().GetStorage();
+    if(!st.SyncIsAssociated()) {
+        // ideally we should show an explaination and an option dialog to setup, connect or cancel
+        // but in the meantime let's just show an error message
+        return;
+    }
+    cout << "sync not implemented yet" << endl;
+}
+
+void MainWindow::OnSyncSetupNewAccount(wxCommandEvent &evt)
+{
+    cout << "sync setup new account not implemented yet" << endl;
+}
+
+void MainWindow::OnSyncSetup(wxCommandEvent &evt)
+{
+    cout << "sync setup not implemented yet" << endl;
+}
+
+void MainWindow::OnSyncDeleteFromServer(wxCommandEvent &evt)
+{
+    cout << "sync delete not implemented yet" << endl;
+}
+
+void MainWindow::OnSyncReset(wxCommandEvent &evt)
+{
+    cout << "sync reset not implemented yet" << endl;
+}
+
+void MainWindow::OnSyncShowKey(wxCommandEvent &evt)
+{
+    cout << "sync show key not implemented yet" << endl;
+}
+
 
 // IRTNode methods
 // ---------------

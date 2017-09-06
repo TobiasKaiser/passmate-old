@@ -26,7 +26,7 @@ class SyncableStorage : public Storage {
 		// Setup: Create new account
 		std::string SyncSetupNewAccount(std::string hostname);
 		
-		// Deassociate and dlete all data from server
+		// Deassociate and delete all data from server
 		std::string SyncDeleteFromServer();
 
 		// Deassociate but keep all data on server

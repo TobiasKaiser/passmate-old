@@ -34,7 +34,6 @@ class MainWindow : public wxFrame {
 
         void OnRecordActivated(wxTreeEvent& event);
         void OnButtonAddRecord(wxCommandEvent &evt);
-        void OnButtonSync(wxCommandEvent &evt);
         void OnButtonRemove(wxCommandEvent &evt);
         void OnButtonRename(wxCommandEvent &evt);
         void OnButtonAddField(wxCommandEvent &evt);
@@ -53,6 +52,13 @@ class MainWindow : public wxFrame {
         void OnFieldMaskUnmask(wxCommandEvent &evt);
         void OnFieldClip(wxCommandEvent &evt);
         void OnFieldRemove(wxCommandEvent &evt);
+
+        void OnSync(wxCommandEvent &evt);
+        void OnSyncSetupNewAccount(wxCommandEvent &evt);
+        void OnSyncSetup(wxCommandEvent &evt);
+        void OnSyncDeleteFromServer(wxCommandEvent &evt);
+        void OnSyncReset(wxCommandEvent &evt);
+        void OnSyncShowKey(wxCommandEvent &evt);
 
         // Helper classes
         // --------------
@@ -110,7 +116,9 @@ class MainWindow : public wxFrame {
         wxPanel *panelRight;
         wxTextCtrl *entryFilter;
 
-        int menuIdChangePass, menuIdDoc, menuIdHelp, menuIdSync;
+        int menuIdChangePass, menuIdDoc, menuIdHelp;
+
+        int menuIdSync, menuIdSyncSetup, menuIdSyncSetupNewAccount, menuIdSyncDeleteFromServer, menuIdSyncReset, menuIdSyncShowKey;
 
         // Other attributes
         // ----------------
