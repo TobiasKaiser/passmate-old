@@ -442,7 +442,7 @@ void ScryptDecCtx::setup(const uint8_t * passwd, size_t passwdlen, size_t maxmem
 	mbedtls_md_hmac_finish(&hctx, hbuf);
 
 	if (memcmp(hbuf, &header[64], 32)) {
-		//throw Storage::Exception(Storage::Exception::CRYPTO_ERROR, "Invalid header HMAC");
+		// If the HMAC is incorrect, this means we have no got the right passphrase.
 		throw Storage::Exception(Storage::Exception::WRONG_PASSPHRASE);
 	}
 }

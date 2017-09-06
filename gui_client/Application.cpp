@@ -7,7 +7,7 @@
 
 #include "Application.hpp"
 #include "MainWindow.hpp"
-#include "Storage.hpp"
+#include "SyncableStorage.hpp"
 
 
 
@@ -81,7 +81,7 @@ bool Application::OnInit() {
 
 
  	try {
-    	storage=new Storage(storage_filename);
+    	storage=new SyncableStorage(storage_filename);
     } catch(const Storage::Exception &stex) {
 		wxMessageDialog errDialog(NULL, wxString("Error: "+ string(stex.what())), wxT("Error"), wxOK|wxCENTRE);
 		errDialog.ShowModal();

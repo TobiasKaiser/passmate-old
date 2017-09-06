@@ -4,7 +4,7 @@
 
 #include "MainWindow.hpp"
 #include "Application.hpp"
-#include "Storage.hpp"
+#include "SyncableStorage.hpp"
 
 #include <wx/splitter.h>
 #include <wx/sizer.h>
@@ -154,7 +154,7 @@ void MainWindow::SwitchToRecord(std::string path)
 {
     // TODO: Ask for confirmation if there are changes to the current record here.
 
-    Storage &st = wxGetApp().GetStorage();
+    SyncableStorage &st = wxGetApp().GetStorage();
 
     cur_record = st.GetRecord(path);
     ShowCommitBar(false);
@@ -186,7 +186,7 @@ void MainWindow::UpdateRecordTree()
     }
 
 
-    Storage &st = wxGetApp().GetStorage();
+    SyncableStorage &st = wxGetApp().GetStorage();
 
     recordTree->DeleteAllItems();
 
@@ -441,7 +441,7 @@ std::map<std::string, std::vector<std::string>>  MainWindow::GetGUIRecord()
 
 
 void MainWindow::OnChangePass(wxCommandEvent &evt) {
-    Storage &st = wxGetApp().GetStorage();
+    SyncableStorage &st = wxGetApp().GetStorage();
 
     // Check previous passphrase
 
@@ -501,7 +501,7 @@ void MainWindow::OnClose(wxCommandEvent& WXUNUSED(event))
 
 void MainWindow::OnButtonAddRecord(wxCommandEvent &evt)
 {
-    Storage &st = wxGetApp().GetStorage();
+    SyncableStorage &st = wxGetApp().GetStorage();
 
 
     wxTextEntryDialog recordNameDialog(this, wxT("New record name:"));
@@ -532,7 +532,7 @@ void MainWindow::OnButtonRemove(wxCommandEvent &evt)
         return;
     }
 
-    Storage &st = wxGetApp().GetStorage();
+    SyncableStorage &st = wxGetApp().GetStorage();
 
     wxMessageDialog confirmationDialog(this, wxString("Do you want to remove record "+ cur_record.GetPath()+"?"), wxT("Remove record"), wxYES|wxNO|wxCENTRE);
 
@@ -560,7 +560,7 @@ void MainWindow::OnButtonRename(wxCommandEvent &evt)
         return;
     }
 
-    Storage &st = wxGetApp().GetStorage();
+    SyncableStorage &st = wxGetApp().GetStorage();
 
     wxTextEntryDialog recordNameDialog(this, wxT("New record name:"));
     
@@ -624,7 +624,7 @@ void MainWindow::OnButtonAddField(wxCommandEvent &evt)
 
 void MainWindow::OnButtonSaveChanges(wxCommandEvent &evt)
 {
-    Storage &st = wxGetApp().GetStorage();
+    SyncableStorage &st = wxGetApp().GetStorage();
 
     std::map<std::string, std::vector<std::string>> guiRecord = GetGUIRecord();
 

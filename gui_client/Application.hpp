@@ -4,7 +4,7 @@
 
 #include <wx/wx.h>
 
-class Storage;
+class SyncableStorage;
 
 class Application : public wxApp {
     public:
@@ -13,7 +13,7 @@ class Application : public wxApp {
         virtual bool OnInit();
         virtual int OnExit();
 
-        Storage &GetStorage() {
+        SyncableStorage &GetStorage() {
         	if(storage) {
         		return *storage;
  			} else {
@@ -22,7 +22,7 @@ class Application : public wxApp {
         }
 
     protected:
-        Storage *storage;
+        SyncableStorage *storage;
         std::string storage_filename;
 };
 
