@@ -1,5 +1,5 @@
 CXX=$(shell wx-config --cxx)
-CXXFLAGS+=-Wall -I/usr/local/include -Wfatal-errors
+CXXFLAGS+=-Wall -I/usr/local/include -Iinclude -Wfatal-errors
 CXXFLAGS+=$(shell wx-config  --cppflags core,base,gl) -DGLEW_BUILD=GLEW_STATIC
 #CXXFLAGS+=-I/usr/include/machine # we need this for <endian.h>?!?!
 CXXFLAGS+=-g -O0 # debug me
@@ -8,8 +8,8 @@ CXXFLAGS+=-g -O0 # debug me
 LIBS+=$(shell wx-config --libs) -lscrypt -lmbedtls -lmbedcrypto
 LDFLAGS=$(CXXFLAGS)
 TARGET=passmate
-#SRC=$(wildcard *.cpp)
-SRC=Record.cpp Storage.cpp MainWindow.cpp Application.cpp ScryptEncCPUPerf.cpp ScryptEnc.cpp
+SRC=$(wildcard *.cpp)
+#SRC=Record.cpp Storage.cpp MainWindow.cpp Application.cpp ScryptEnc.cpp
 EECHO=echo
 .PHONY: all
 all: $(TARGET)

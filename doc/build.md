@@ -7,3 +7,4 @@ External dependencies:
 Internal sources:
 * nlohmann json library
 * scrypt (tarsnap) scryptenc
+* jarro2783's cxxopts
