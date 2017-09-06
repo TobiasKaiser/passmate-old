@@ -3,6 +3,8 @@
 
 #include <wx/msgdlg.h>
 
+#include "cxxopts.hpp"
+
 #include "Application.hpp"
 #include "MainWindow.hpp"
 #include "Storage.hpp"
@@ -16,13 +18,58 @@ wxIMPLEMENT_APP(Application);
 
 Application::Application() {
     storage=NULL;
-    storage_filename = string(getenv("HOME")) + "/.pmate";
+
+
+    storage_filename = "";
 }
 
 bool Application::OnInit() {
-    if(!wxApp::OnInit()) {
-        return false;
-    }
+    //if(!wxApp::OnInit()) {
+    //    return false;
+    //}
+
+
+	cxxopts::Options options("passmate", "Password manager");
+	options.positional_help("[optional args]");
+
+	options.add_options()
+  		//("d,debug", "Enable debugging")
+  		("h,help" , "Print help")
+  		("f,storage-filename", "Storage filename", cxxopts::value<std::string>());
+
+
+	char **myArgv = argv;
+
+	try {
+		options.parse(argc, myArgv);
+	} catch (const cxxopts::OptionException& e) {
+
+		std::cout << "error parsing options: " << e.what() << std::endl;
+		return false;
+	}
+
+	if (options.count("help")) {
+		std::cout << options.help({"", "Group"}) << std::endl;
+		exit(0);
+	}
+
+	
+	if(options.count("f")) {
+		storage_filename = options["f"].as<string>();
+	} else {
+	
+		char *home = getenv("HOME");
+
+		if(!home) {
+			wxMessageDialog errDialog(NULL, wxString("Error: $HOME not set. Please set $HOME or provide --storage-filname."), wxT("Error"), wxOK|wxCENTRE);
+			errDialog.ShowModal();
+  	
+			return false;
+		}
+
+		storage_filename = string(home) + "/.pmate";
+	}
+
 
  	try {
     	storage=new Storage(storage_filename);
@@ -64,7 +111,7 @@ bool Application::OnInit() {
 			errDialog.ShowModal();
 
 			return false;
-	   	}
+		   	}
 
 
     } else {
