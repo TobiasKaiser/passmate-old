@@ -14,6 +14,8 @@
 
 using namespace std;
 
+const static char *defaultHostname = "passmate.net";
+
 MainWindow::MainWindow()
     : wxFrame(NULL, wxID_ANY, wxT("Passmate"), wxDefaultPosition, wxSize(0, 0))
     , irt_root(NULL, "")
@@ -40,13 +42,11 @@ MainWindow::MainWindow()
     wxButton *buttonSync=new wxButton(panelLeft, wxID_ANY, _T("Sync database"));
     buttonSync->SetBitmap(wxArtProvider::GetBitmap("gtk-network", wxART_MENU));
 
-
-    wxButton *buttonRemove=new wxButton(panelRight, wxID_ANY, _T("Remove record"));
+    buttonRemove=new wxButton(panelRight, wxID_ANY, _T("Remove record"));
     buttonRemove->SetBitmap(wxArtProvider::GetBitmap(wxART_DELETE));
-    wxButton *buttonRename=new wxButton(panelRight, wxID_ANY, _T("Rename record"));
+    buttonRename=new wxButton(panelRight, wxID_ANY, _T("Rename record"));
     buttonRename->SetBitmap(wxArtProvider::GetBitmap("gtk-edit", wxART_MENU));
-    
-    wxButton *buttonAddField=new wxButton(panelRight, wxID_ANY, _T("Add field"));
+    buttonAddField=new wxButton(panelRight, wxID_ANY, _T("Add field"));
     buttonAddField->SetBitmap(wxArtProvider::GetBitmap(wxART_PLUS));
     
     //wxButton *buttonHistory=new wxButton(panelRight, wxID_ANY, _T("History"));
@@ -151,7 +151,7 @@ MainWindow::MainWindow()
 void MainWindow::InitMenu()
 {
     // Setup menu
-    wxMenuBar *menubar = new wxMenuBar();
+    menubar = new wxMenuBar();
     wxMenu *menuStore, *menuSync, *menuHelp;
     menuStore = new wxMenu();
     menuSync = new wxMenu();
@@ -163,9 +163,9 @@ void MainWindow::InitMenu()
     menuIdDoc = menuHelp->Append(wxID_ANY, wxT("&Documentation"))->GetId();
     menuIdHelp = menuHelp->Append(wxID_ANY, wxT("Visit &Website"))->GetId();
 
-    menuIdSync =                    menuSync->Append(wxID_ANY, wxT("&Sync now"))->GetId();
-    menuIdSyncSetup =               menuSync->Append(wxID_ANY, wxT("&Connection to existing account"))->GetId();
     menuIdSyncSetupNewAccount =     menuSync->Append(wxID_ANY, wxT("Create &new account"))->GetId();
+    menuIdSyncSetup =               menuSync->Append(wxID_ANY, wxT("&Connection to existing account"))->GetId();
+    menuIdSync =                    menuSync->Append(wxID_ANY, wxT("&Sync now"))->GetId();
     menuIdSyncDeleteFromServer =    menuSync->Append(wxID_ANY, wxT("D&elete account"))->GetId();
     menuIdSyncReset =               menuSync->Append(wxID_ANY, wxT("&Disconnect from account"))->GetId();
     menuIdSyncShowKey =             menuSync->Append(wxID_ANY, wxT("Show sync &key"))->GetId();
@@ -179,14 +179,35 @@ void MainWindow::InitMenu()
     Connect(menuIdDoc, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(MainWindow::OnDoc));
     Connect(menuIdHelp, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(MainWindow::OnHelp));
 
-    Connect(menuIdSync,                 wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(MainWindow::OnSync));
-    Connect(menuIdSyncSetup,            wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(MainWindow::OnSyncSetup));
     Connect(menuIdSyncSetupNewAccount,  wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(MainWindow::OnSyncSetupNewAccount));
+    Connect(menuIdSyncSetup,            wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(MainWindow::OnSyncSetup));
+    Connect(menuIdSync,                 wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(MainWindow::OnSync));
     Connect(menuIdSyncDeleteFromServer, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(MainWindow::OnSyncDeleteFromServer));
     Connect(menuIdSyncReset,            wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(MainWindow::OnSyncReset));
     Connect(menuIdSyncShowKey,          wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(MainWindow::OnSyncShowKey));
     
     SetMenuBar(menubar);
+
+    UpdateMenuEntries();
+}
+
+
+
+void MainWindow::UpdateMenuEntries()
+{
+    SyncableStorage &st = wxGetApp().GetStorage();
+    bool associated = st.SyncIsAssociated();
+    
+    // Some entries can be clicked if we are not associated with an account
+    menubar->Enable(menuIdSyncSetup, !associated);
+    menubar->Enable(menuIdSyncSetupNewAccount, !associated);
+
+    // Some only if we are associated
+    menubar->Enable(menuIdSync, associated);
+    menubar->Enable(menuIdSyncDeleteFromServer, associated);
+    menubar->Enable(menuIdSyncReset, associated);
+    menubar->Enable(menuIdSyncShowKey, associated);
+
 }
 
 
@@ -293,14 +314,18 @@ void MainWindow::UpdateRecordPanel()
 
     sizerRecord->Clear(true);
 
+
+    bool validRecord = cur_record.IsValid();
+
+    buttonRemove->Enable(validRecord);
+    buttonRename->Enable(validRecord);
+    buttonAddField->Enable(validRecord);
+
     cur_record_text_ctrls.clear();
-
     std::map<std::string, std::vector<std::string>> fields = cur_record.GetFields();
-
     wxStaticText *label;
 
-
-    if(cur_record.IsValid()) {
+    if(validRecord) {
 
         // Path
         label=new wxStaticText(panelRecord, wxID_ANY, std::string("Path:"));
@@ -333,7 +358,6 @@ void MainWindow::UpdateRecordPanel()
 
         }
     }        
-
 
     sizerRecord->ShowItems(true);
     panelRecord->Layout();
@@ -448,6 +472,29 @@ std::map<std::string, std::vector<std::string>>  MainWindow::GetGUIRecord()
     return ret;
 }
 
+bool MainWindow::confirmPass() {
+    SyncableStorage &st = wxGetApp().GetStorage();
+
+    wxPasswordEntryDialog passwordDialog(NULL, wxT("Please re-enter passphrase:"));
+    
+    do {
+        passwordDialog.SetValue(wxT(""));
+
+        if(passwordDialog.ShowModal() != wxID_OK) {
+            return false;
+        }
+
+        if( st.CheckPassphrase(string(passwordDialog.GetValue())) ) {
+            return true;
+        } else {
+            wxMessageDialog errDialog(NULL, wxString("Error: Wrong passphrase"), wxT("Error"), wxOK|wxCENTRE);
+            errDialog.ShowModal();          
+
+        }
+    } while(1);
+}
+
+
 // Event handler methods
 // ---------------------
 
@@ -456,7 +503,9 @@ void MainWindow::OnChangePass(wxCommandEvent &evt) {
     SyncableStorage &st = wxGetApp().GetStorage();
 
     // Check previous passphrase
-
+    if(!confirmPass()) {
+        return;
+    }
 
 
     // Set new passphrase
@@ -520,15 +569,16 @@ void MainWindow::OnButtonAddRecord(wxCommandEvent &evt)
     if (recordNameDialog.ShowModal() == wxID_OK) {
         string path(recordNameDialog.GetValue());
 
-
-        st.NewRecord(path);
-        st.Save();
-
-        SwitchToRecord(path);
-
-        UpdateRecordTree();
- 
-        recordTree->SelectItem(irt_root.FindByPath(path)->item_id);
+        try {
+            st.NewRecord(path);
+            st.Save();
+            SwitchToRecord(path);
+            UpdateRecordTree();
+            recordTree->SelectItem(irt_root.FindByPath(path)->item_id);
+        } catch(const Storage::Exception &stex) {
+            wxMessageDialog errDialog(NULL, wxString("Error: "+ string(stex.what())), wxT("Error"), wxOK|wxCENTRE);
+            errDialog.ShowModal();
+        }
     }
 }
 
@@ -544,13 +594,17 @@ void MainWindow::OnButtonRemove(wxCommandEvent &evt)
 
     if (confirmationDialog.ShowModal() == wxID_YES) {
         string path = cur_record.GetPath();
-        st.DeleteRecord(path);
-        st.Save();
+        try {
+            st.DeleteRecord(path);
+            st.Save();
+            UpdateRecordTree();
+            SwitchToNoRecord();
+        } catch(const Storage::Exception &stex) {
+            wxMessageDialog errDialog(NULL, wxString("Error: "+ string(stex.what())), wxT("Error"), wxOK|wxCENTRE);
+            errDialog.ShowModal();
+        }
     }
 
-    UpdateRecordTree();
-
-    SwitchToNoRecord();
 }
 
 void MainWindow::OnButtonRename(wxCommandEvent &evt)
@@ -573,16 +627,16 @@ void MainWindow::OnButtonRename(wxCommandEvent &evt)
     recordNameDialog.SetValue(wxString(cur_record.GetPath()));
 
     if(recordNameDialog.ShowModal() == wxID_OK) {
-        st.MoveRecord(string(recordNameDialog.GetValue()), cur_record.GetPath());
-        st.Save();
-
-        cur_record = st.GetRecord(string(recordNameDialog.GetValue()));
-
-
-        UpdateRecordTree();
-
-        UpdateRecordPanel();
-
+        try {
+            st.MoveRecord(string(recordNameDialog.GetValue()), cur_record.GetPath());
+            st.Save();
+            cur_record = st.GetRecord(string(recordNameDialog.GetValue()));
+            UpdateRecordTree();
+            UpdateRecordPanel();
+        } catch(const Storage::Exception &stex) {
+            wxMessageDialog errDialog(NULL, wxString("Error: "+ string(stex.what())), wxT("Error"), wxOK|wxCENTRE);
+            errDialog.ShowModal();
+        }
     }
     
 }
@@ -639,9 +693,13 @@ void MainWindow::OnButtonSaveChanges(wxCommandEvent &evt)
     wxMessageDialog confirmationDialog(this, wxString("Do you want to apply the following changes?\n" + proposedChanges), wxT("Save changes"), wxYES|wxNO|wxCENTRE);
 
     if (confirmationDialog.ShowModal() == wxID_YES) {
-        cur_record.SetNewFieldsToStorage(&st, guiRecord);
-        st.Save();
-
+        try {
+            cur_record.SetNewFieldsToStorage(&st, guiRecord);
+            st.Save();
+        } catch(const Storage::Exception &stex) {
+            wxMessageDialog errDialog(NULL, wxString("Error: "+ string(stex.what())), wxT("Error"), wxOK|wxCENTRE);
+            errDialog.ShowModal();
+        }
         cur_record = st.GetRecord(cur_record.GetPath());
         UpdateRecordPanel();
 
@@ -751,34 +809,175 @@ void MainWindow::OnSync(wxCommandEvent &evt)
     if(!st.SyncIsAssociated()) {
         // ideally we should show an explaination and an option dialog to setup, connect or cancel
         // but in the meantime let's just show an error message
+        wxMessageDialog errDialog(NULL, wxString("Error: Not associated with any sync account. Please setup sync first."), wxT("Error"), wxOK|wxCENTRE);
+        errDialog.ShowModal();
         return;
     }
-    cout << "sync not implemented yet" << endl;
+
+    try {
+        string summary = st.Sync();
+        wxMessageDialog errDialog(NULL, wxString("Sync summary:\n"+ summary), wxT("Summary"), wxOK|wxCENTRE);
+        errDialog.ShowModal();
+
+        st.Save();
+    } catch(const Storage::Exception &stex) {
+        wxMessageDialog errDialog(NULL, wxString("Error: "+ string(stex.what())), wxT("Error"), wxOK|wxCENTRE);
+        errDialog.ShowModal();
+    }
+
+    UpdateMenuEntries();
+    
 }
 
 void MainWindow::OnSyncSetupNewAccount(wxCommandEvent &evt)
 {
-    cout << "sync setup new account not implemented yet" << endl;
+    SyncableStorage &st = wxGetApp().GetStorage();
+    
+    if(st.SyncIsAssociated()) {
+        // Should never happen, because of menu item enabled state
+        return;
+    }
+
+    wxTextEntryDialog hostnameDialog(this, wxT("Remote hostname:"));
+    hostnameDialog.SetValue(wxString(defaultHostname));
+    if (hostnameDialog.ShowModal() != wxID_OK) {
+        return;
+    }
+    string hostname(hostnameDialog.GetValue());
+
+    try {
+        string summary = st.SyncSetupNewAccount(hostname);
+        wxMessageDialog errDialog(NULL, wxString("Sync setup new account summary:\n"+ summary), wxT("Summary"), wxOK|wxCENTRE);
+        errDialog.ShowModal();
+
+        st.Save();
+    } catch(const Storage::Exception &stex) {
+        wxMessageDialog errDialog(NULL, wxString("Error: "+ string(stex.what())), wxT("Error"), wxOK|wxCENTRE);
+        errDialog.ShowModal();
+    }
+
+    UpdateMenuEntries();
 }
 
 void MainWindow::OnSyncSetup(wxCommandEvent &evt)
 {
-    cout << "sync setup not implemented yet" << endl;
+    SyncableStorage &st = wxGetApp().GetStorage();
+    
+    if(st.SyncIsAssociated()) {
+        // Should never happen, because of menu item enabled state
+        return;
+    }
+
+    wxTextEntryDialog hostnameDialog(this, wxT("Remote hostname:"));
+    hostnameDialog.SetValue(wxString(defaultHostname));
+    if (hostnameDialog.ShowModal() != wxID_OK) {
+        return;
+    }
+
+
+    wxTextEntryDialog syncKeyDialog(this, wxT("Sync key:"));
+    if (syncKeyDialog.ShowModal() != wxID_OK) {
+        return;
+    }
+  
+    string hostname(hostnameDialog.GetValue());
+    string syncKey(syncKeyDialog.GetValue());
+
+    try {
+        string summary = st.SyncSetup(hostname, syncKey);
+        wxMessageDialog errDialog(NULL, wxString("Sync setup summary:\n"+ summary), wxT("Summary"), wxOK|wxCENTRE);
+        errDialog.ShowModal();
+
+        st.Save();
+
+    } catch(const Storage::Exception &stex) {
+        wxMessageDialog errDialog(NULL, wxString("Error: "+ string(stex.what())), wxT("Error"), wxOK|wxCENTRE);
+        errDialog.ShowModal();
+    }
+
+    UpdateMenuEntries();
 }
 
 void MainWindow::OnSyncDeleteFromServer(wxCommandEvent &evt)
 {
-    cout << "sync delete not implemented yet" << endl;
+    SyncableStorage &st = wxGetApp().GetStorage();
+    
+    if(!st.SyncIsAssociated()) {
+        // Should never happen, because of menu item enabled state
+        return;
+    }
+    
+    wxMessageDialog confirmationDialog(this, wxString("Do you want to delete all sync data from server?"), wxT("Sync delete from server"), wxYES|wxNO|wxCENTRE);
+    if (confirmationDialog.ShowModal() != wxID_YES) {
+        return;
+    }
+ 
+    try {
+        string summary = st.SyncDeleteFromServer();
+        wxMessageDialog errDialog(NULL, wxString("Sync delete from server summary:\n"+ summary), wxT("Summary"), wxOK|wxCENTRE);
+        errDialog.ShowModal();
+
+        st.Save();
+
+    } catch(const Storage::Exception &stex) {
+        wxMessageDialog errDialog(NULL, wxString("Error: "+ string(stex.what())), wxT("Error"), wxOK|wxCENTRE);
+        errDialog.ShowModal();
+    }
+
+    UpdateMenuEntries();
 }
 
 void MainWindow::OnSyncReset(wxCommandEvent &evt)
 {
-    cout << "sync reset not implemented yet" << endl;
+    SyncableStorage &st = wxGetApp().GetStorage();
+    
+    if(!st.SyncIsAssociated()) {
+        // Should never happen, because of menu item enabled state
+        return;
+    }
+
+    wxMessageDialog confirmationDialog(this, wxString("Do you want to reset your local sync connection and keep sync data on server?"), wxT("Sync reset"), wxYES|wxNO|wxCENTRE);
+    if (confirmationDialog.ShowModal() != wxID_YES) {
+        return;
+    }
+
+    try {
+        string summary = st.SyncReset();
+        wxMessageDialog errDialog(NULL, wxString("Sync reset summary:\n"+ summary), wxT("Summary"), wxOK|wxCENTRE);
+        errDialog.ShowModal();
+
+        st.Save();
+    } catch(const Storage::Exception &stex) {
+        wxMessageDialog errDialog(NULL, wxString("Error: "+ string(stex.what())), wxT("Error"), wxOK|wxCENTRE);
+        errDialog.ShowModal();
+    }
+
+
+    UpdateMenuEntries();
 }
 
 void MainWindow::OnSyncShowKey(wxCommandEvent &evt)
 {
-    cout << "sync show key not implemented yet" << endl;
+    SyncableStorage &st = wxGetApp().GetStorage();
+    
+    if(!st.SyncIsAssociated()) {
+        // Should never happen, because of menu item enabled state
+        return;
+    }
+
+    // Check passphrase for security
+    if(!confirmPass()) {
+        return;
+    }
+    try {
+        string key = st.SyncGetKey();
+        wxMessageDialog errDialog(NULL, wxString("Sync key:\n"+ key), wxT("Sync key"), wxOK|wxCENTRE);
+        errDialog.ShowModal();
+
+    } catch(const Storage::Exception &stex) {
+        wxMessageDialog errDialog(NULL, wxString("Error: "+ string(stex.what())), wxT("Error"), wxOK|wxCENTRE);
+        errDialog.ShowModal();
+    }
 }
 
 

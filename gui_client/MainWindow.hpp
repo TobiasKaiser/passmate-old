@@ -19,15 +19,17 @@ class MainWindow : public wxFrame {
         // Internally used methods
         // -----------------------
 
+        void InitMenu();
+        void UpdateMenuEntries();
         void UpdateRecordPanel();
         void UpdateRecordTree();
-        void InitMenu();
         std::map<std::string, std::vector<std::string>> GetGUIRecord();
         void SwitchToRecord(std::string path);
         void SwitchToNoRecord();
         void ShowCommitBar(bool enable);
         void addFieldToPanel(std::string key, std::vector<std::string> values);
         bool isPasswordField(std::string key);
+        bool confirmPass();
 
         // Event handler
         // -------------
@@ -115,6 +117,11 @@ class MainWindow : public wxFrame {
         wxPanel *commitChangeBar;
         wxPanel *panelRight;
         wxTextCtrl *entryFilter;
+        wxMenuBar *menubar;
+
+        wxButton *buttonRemove;
+        wxButton *buttonRename;
+        wxButton *buttonAddField;
 
         int menuIdChangePass, menuIdDoc, menuIdHelp;
 

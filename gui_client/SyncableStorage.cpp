@@ -106,7 +106,7 @@ void SyncableStorage::PutBToken(string btoken, string key)
 
 bool SyncableStorage::SyncIsAssociated()
 {
-	return false;
+	return (config.count("sync_host") > 0) && (config.count("sync_key") > 0);
 }
 
 /*	def sync_associated(self):
@@ -163,7 +163,13 @@ string SyncableStorage::SyncSetup(string hostname, string key)
 	if(SyncIsAssociated()) {
 		throw Storage::Exception(Storage::Exception::SYNC_ALREADY_ASSOCIATED);	
 	}
-	return "Not implemented yet.";
+
+	config["sync_host"] = hostname;
+	config["sync_key"] = key;
+
+	changed = true;
+
+	return "Setup ok, server not contacted yet.";
 }
 
 string SyncableStorage::SyncSetupNewAccount(string hostname)
@@ -187,6 +193,19 @@ string SyncableStorage::SyncReset()
 	if(!SyncIsAssociated()) {
 		throw Storage::Exception(Storage::Exception::SYNC_NOT_ASSOCIATED);	
 	}
+
+	if(config.count("sync_key")) {
+		config.erase("sync_key");	
+	}
+	if(config.count("sync_host")) {
+		config.erase("sync_host");	
+	}
+	if(config.count("own_ca_data")) {
+		config.erase("own_ca_data");	
+	}
+
+	changed = true;
+	
 	return "Not implemented yet.";
 }
 
