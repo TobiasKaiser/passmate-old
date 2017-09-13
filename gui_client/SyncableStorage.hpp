@@ -35,8 +35,16 @@ class SyncableStorage : public Storage {
 		// Synchronize password storage with server
 		std::string Sync();
 
+		static void unpack_key(const std::string &key, std::string &account_no, std::string &enckey);
+		static uint16_t crc16(const uint8_t *data, size_t len);
+		static std::string pack_key(const std::string &account_no, const std::string &enckey);
 	protected:
 		std::string GetBToken(std::string key);
 		void PutBToken(std::string btoken, std::string key);
+
+
+		constexpr static const char *handshake1 = "passmate-server-protocol";
+		constexpr static const char *handshake2 = "passmate-protocol-server";
+
 
 };

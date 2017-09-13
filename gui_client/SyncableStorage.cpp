@@ -2,13 +2,15 @@
 #include <cstdio>
 #include <string>
 
+#include <arpa/inet.h>
+
 #include "SyncableStorage.hpp"
 
 using namespace std;
 
 
 // CRC-CCITT / http://stackoverflow.com/questions/10564491/function-to-calculate-a-crc16-checksum
-static uint16_t crc16(uint8_t *data, size_t len)
+uint16_t SyncableStorage::crc16(const uint8_t *data, size_t len)
 {
 	uint16_t crc = 0xFFFF;
 
@@ -19,12 +21,10 @@ static uint16_t crc16(uint8_t *data, size_t len)
 
 		crc &= 0xFFFF; // not necessary ;P
 	}
+
+	return crc;
 }
 
-static string pack_key(const string &account_no, const string &enckey)
-{
-
-}
 
 //def pack_key(account_no, key):
 //	if len(account_no)!=8:
@@ -38,8 +38,48 @@ static string pack_key(const string &account_no, const string &enckey)
 
 
 // writes key and account no by reference
-static void unpack_key(const string &key, string &account_no, string &enckey)
+void SyncableStorage::unpack_key(const string &key, string &account_no, string &enckey)
 {
+	if(key.length()!= 14*6 + 13) {
+		throw Storage::Exception(Storage::Exception::SYNC_ILLEGAL_KEY);
+	}
+
+	uint8_t data[42 + 1];
+
+	int i;
+	for(i=0;i<14;i++) {
+		unsigned int a=0, b=0, c=0;
+
+		if(sscanf(key.c_str() + 7*i, "%02X%02X%02X", &a, &b, &c) != 3) {
+			throw Storage::Exception(Storage::Exception::SYNC_ILLEGAL_KEY);
+		}
+
+		data[3*i + 0] = a;
+		data[3*i + 1] = b;
+		data[3*i + 2] = c;
+
+		if(i!=13) {
+			if(key[7*i+6]!='-') {
+				throw Storage::Exception(Storage::Exception::SYNC_ILLEGAL_KEY);	
+			}
+		}
+	}
+
+	data[43] = '\0';
+
+	uint16_t checksum = crc16(data, 32 + 8);
+
+	uint16_t checksum_be = htons(checksum);
+
+	if(memcmp(&checksum_be, data+40, 2)!=0) {
+		throw Storage::Exception(Storage::Exception::SYNC_ILLEGAL_KEY);
+	}
+
+	string data_str( (char*)data);
+
+	account_no = data_str.substr(0, 8);
+
+	enckey = data_str.substr(8, 32);
 
 }
 
@@ -54,9 +94,42 @@ static void unpack_key(const string &key, string &account_no, string &enckey)
 //		raise SyncError(SyncError.ILLEGAL_KEY)
 //	return account_no, key
 
+string SyncableStorage::pack_key(const string &account_no, const string &enckey)
+{
+	if(account_no.length() != 8) {
+		throw Storage::Exception(Storage::Exception::CRYPTO_ERROR, "Account no has the wrong length");
+	}
+	if(enckey.length() != 32) {
+		throw Storage::Exception(Storage::Exception::CRYPTO_ERROR, "Enckey has the wrong length");
+	}
 
-const static char *handshake1 = "passmate-server-protocol";
-const static char *handshake2 = "passmate-protocol-server";
+	uint8_t data[42 + 1];
+
+	memcpy(data + 0, account_no.c_str(), 8);
+
+	memcpy(data + 8, enckey.c_str(), 32);
+
+	uint16_t checksum = crc16(data, 32 + 8);
+
+	uint16_t checksum_be = htons(checksum);
+
+	memcpy(data + 40, &checksum_be, 2);
+
+	data[43] = '\0'; // not really necessary
+
+	char data_out[14*6 + 13 + 1];
+
+	int i;
+	for(i=0;i<14;i++) {
+		sprintf(data_out + 7*i, "%02X%02X%02X", data[3*i+0], data[3*i+1], data[3*i+2]);
+		if(i!=13) {
+			data_out[7*i+6]='-';
+		} // else sprintf already added the 0
+	}
+
+	return string(data_out);
+}
+
 
 
 //def all_keys(self, key):
