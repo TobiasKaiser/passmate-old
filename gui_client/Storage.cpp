@@ -525,14 +525,27 @@ void Storage::RecordUnset(string const &path, string const &key)
 
 Storage::Exception::Exception(Storage::Exception::Err errCode) throw()
 {
+	this->returnCustomErrMsg = false;
 	this->errCode = errCode;
 	this->explaination = "";
+
 }
 
 Storage::Exception::Exception(Storage::Exception::Err errCode, std::string explaination) throw()
 {
+	this->returnCustomErrMsg = false;
 	this->errCode = errCode;
 	this->explaination = explaination;
+	std::ostringstream ss;
+	ss << what() << " (" << explaination << ")";
+
+	std::string s(ss.str());
+
+	strncpy(errMsg, s.c_str(), ERR_MSG_LENGTH);
+	errMsg[ERR_MSG_LENGTH-1]='\0';
+
+	returnCustomErrMsg = true;
+
 }
 
 Storage::Exception::Err Storage::Exception::getErrCode() const throw()
@@ -542,6 +555,9 @@ Storage::Exception::Err Storage::Exception::getErrCode() const throw()
 
 const char* Storage::Exception::what() const throw()
 {
+	if(returnCustomErrMsg) {
+		return errMsg;
+	}
 	switch(errCode) {
 		case FILE_ALREADY_EXISTS: return "File already exists.";
 		case NOT_IMPLEMENTED: return "Not implemented.";
@@ -555,6 +571,14 @@ const char* Storage::Exception::what() const throw()
 		case JSON_PARSE_ERROR: return "JSON parse error.";
 		case WRONG_PASSPHRASE: return "Wrong passphrase.";		
 		case ERROR_SAVING_FILE: return "Error saving file.";
+		case SYNC_GENERIC_ERROR: return "Generic sync error.";
+		case SYNC_SERVER_ERROR: return "Sync server error.";
+		case SYNC_ALREADY_ASSOCIATED: return "Already associated with sync server.";
+		case SYNC_NOT_ASSOCIATED: return "Not associated with sync server.";
+		case SYNC_SERVER_PROTOCOL_VERSION_MISMATCH: return "Sync server protocol version mismatch";
+		case SYNC_ILLEGAL_KEY: return "Illegal sync key.";
+		case SYNC_ILLEGAL_BTOKEN: return "Illegal btoken received.";
+		case SYNC_UNEXPECTED_COMMUNICATION_END: return "Unexpected end of communication.";
 
 		default: return "???";
 	}

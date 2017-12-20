@@ -1,8 +1,18 @@
 
 #include <cstdio>
 #include <string>
+#include <utility>
 
 #include <arpa/inet.h>
+
+
+#include "mbedtls/net_sockets.h"
+#include "mbedtls/debug.h"
+#include "mbedtls/ssl.h"
+#include "mbedtls/entropy.h"
+#include "mbedtls/ctr_drbg.h"
+#include "mbedtls/error.h"
+#include "mbedtls/certs.h"
 
 #include "SyncableStorage.hpp"
 
@@ -24,18 +34,6 @@ uint16_t SyncableStorage::crc16(const uint8_t *data, size_t len)
 
 	return crc;
 }
-
-
-//def pack_key(account_no, key):
-//	if len(account_no)!=8:
-//		raise ValueError("Illegal account no length")
-//	if len(key)!=32:
-//		raise ValueError("Illegal key length")
-//	data=account_no+key+struct.pack(">H", crc16(account_no+key))
-//	b16data=base64.b16encode(data)
-//	x=map(lambda i: b16data[i:i+6], range(0, len(b16data), 6))
-//	return string.join(x, '-')
-
 
 // writes key and account no by reference
 void SyncableStorage::unpack_key(const string &key, string &account_no, string &enckey)
@@ -82,17 +80,6 @@ void SyncableStorage::unpack_key(const string &key, string &account_no, string &
 	enckey = data_str.substr(8, 32);
 
 }
-
-//def unpack_key(key):
-//	data=base64.b16decode(filter(lambda x: x in string.hexdigits, key))
-//	if len(data)!=42:
-//		raise SyncError(SyncError.ILLEGAL_KEY)
-//	account_no=data[0:8]
-//	key=data[8:40]
-//	checksum=data[40:42]
-//	if crc16(account_no+key)!=struct.unpack(">H", checksum)[0]:
-//		raise SyncError(SyncError.ILLEGAL_KEY)
-//	return account_no, key
 
 string SyncableStorage::pack_key(const string &account_no, const string &enckey)
 {
@@ -141,6 +128,7 @@ string SyncableStorage::pack_key(const string &account_no, const string &enckey)
 string SyncableStorage::GetBToken(string key)
 {
 
+	return "";	
 }
 /*	def get_btoken(self, key):
 		aes_data_key, hmac_key, _=self.all_keys(key)
@@ -195,6 +183,199 @@ bool SyncableStorage::SyncIsAssociated()
 			else:
 				ret+=new
 		return ret */
+
+int SyncableStorage::SSLReadExactly(mbedtls_ssl_context *ssl, const unsigned char *buf, size_t len)
+{
+	/*
+    do
+    {
+        len = sizeof( buf ) - 1;
+        memset( buf, 0, sizeof( buf ) );
+        ret = mbedtls_ssl_read( &ssl, buf, len );
+
+        if( ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_WANT_WRITE )
+            continue;
+
+        if( ret == MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY )
+            break;
+
+        if( ret < 0 )
+        {
+            printf( "failed\n  ! mbedtls_ssl_read returned %d\n\n", ret );
+            break;
+        }
+
+        if( ret == 0 )
+        {
+            printf( "\n\nEOF\n\n" );
+            break;
+        }
+
+        len = ret;
+        printf( " %d bytes read\n\n%s", len, (char *) buf );
+    }
+    while( 1 );*/
+    return len;
+}
+
+int SyncableStorage::SSLWriteExactly(mbedtls_ssl_context *ssl, const unsigned char *buf, size_t len)
+{
+	int ret;
+
+	while( ( ret = mbedtls_ssl_write( ssl, buf, len ) ) <= 0 ) {
+	    if( ret != MBEDTLS_ERR_SSL_WANT_READ && ret != MBEDTLS_ERR_SSL_WANT_WRITE ) {
+	    	// in these cases we should try again. there might be some non-blocking weridness going on.
+	        printf( " failed\n  ! mbedtls_ssl_write returned %d\n\n", ret );
+	        break;
+	    }
+	}
+	return ret;
+	// TODO: Make sure ret is always either negative or equal to len! (partial writes are possible with mbedtls_ssl_write)
+}
+
+
+string SyncableStorage::PerformServerAction(enum SyncableStorage::ServerAction action)
+{
+	std::ostringstream output;
+
+	//const char *server_name = "passmate.net";
+	const char *server_name = "localhost";
+	const char *server_port = "29556";
+    const char *server_cert = "/home/tobias/workspace/passmate/server/cert.pem";
+
+
+	int ret;
+
+    mbedtls_net_context server_fd;
+    mbedtls_net_init( &server_fd );
+    std::unique_ptr<mbedtls_net_context, void(*)(mbedtls_net_context*)> server_fd_ptr(&server_fd, &mbedtls_net_free);
+
+    const char *pers = "CustomString"; // ??
+
+    mbedtls_ctr_drbg_context ctr_drbg;
+    mbedtls_ctr_drbg_init(&ctr_drbg);
+    std::unique_ptr<mbedtls_ctr_drbg_context, void(*)(mbedtls_ctr_drbg_context*)> ctr_drbg_ptr(&ctr_drbg, &mbedtls_ctr_drbg_free);
+
+
+    mbedtls_entropy_context entropy;
+    mbedtls_entropy_init( &entropy );
+    if( ( ret = mbedtls_ctr_drbg_seed( &ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers, strlen( pers ) ) ) != 0 ) {
+    	char error_buf[100];
+        mbedtls_strerror( ret, error_buf, 100 );
+        std::ostringstream error_msg;
+        error_msg << "mbedtls_ctr_drbg_seed failed with return code " << ret << ": " << error_buf;
+    	throw Exception(Exception::SYNC_GENERIC_ERROR, error_msg.str()); 
+    }
+    std::unique_ptr<mbedtls_entropy_context, void(*)(mbedtls_entropy_context*)> entropy_ptr(&entropy, &mbedtls_entropy_free);
+
+    mbedtls_ssl_context ssl;
+    mbedtls_ssl_init(&ssl);
+    std::unique_ptr<mbedtls_ssl_context, void(*)(mbedtls_ssl_context*)> ssl_ptr(&ssl, &mbedtls_ssl_free);
+    
+    mbedtls_ssl_config conf;
+    mbedtls_ssl_config_init( &conf );
+    std::unique_ptr<mbedtls_ssl_config, void(*)(mbedtls_ssl_config*)> mbedtls_ssl_config_ptr(&conf, &mbedtls_ssl_config_free);
+
+    mbedtls_x509_crt cacert;
+	mbedtls_x509_crt_init( &cacert );
+    std::unique_ptr<mbedtls_x509_crt, void(*)(mbedtls_x509_crt*)> cacert_ptr(&cacert, &mbedtls_x509_crt_free);
+
+
+   	// Load CA certificate
+    ret = mbedtls_x509_crt_parse_file( &cacert, server_cert);
+    if( ret < 0 ) {
+        char error_buf[100];
+        mbedtls_strerror( ret, error_buf, 100 );
+        std::ostringstream error_msg;
+        error_msg << "mbedtls_x509_crt_parse_file failed with return code " << ret << ": " << error_buf;
+    	throw Exception(Exception::SYNC_GENERIC_ERROR, error_msg.str());
+    }
+
+    // Connect
+    if( ( ret = mbedtls_net_connect( &server_fd, server_name, server_port, MBEDTLS_NET_PROTO_TCP ) ) != 0 ) {
+        char error_buf[100];
+        mbedtls_strerror( ret, error_buf, 100 );
+        std::ostringstream error_msg;
+        error_msg << "mbedtls_net_connect failed with return code " << ret << ": " << error_buf;
+    	throw Exception(Exception::SYNC_GENERIC_ERROR, error_msg.str());
+    }
+
+    // Setup TLS connection
+    if( ( ret = mbedtls_ssl_config_defaults( &conf, MBEDTLS_SSL_IS_CLIENT, MBEDTLS_SSL_TRANSPORT_STREAM, MBEDTLS_SSL_PRESET_DEFAULT ) ) != 0 ) {
+	    char error_buf[100];
+        mbedtls_strerror( ret, error_buf, 100 );
+        std::ostringstream error_msg;
+        error_msg << "mbedtls_ssl_config_defaults failed with return code " << ret << ": " << error_buf;
+    	throw Exception(Exception::SYNC_GENERIC_ERROR, error_msg.str());
+    }
+
+    mbedtls_ssl_conf_authmode( &conf, MBEDTLS_SSL_VERIFY_REQUIRED ); // MBEDTLS_SSL_VERIFY_OPTIONAL to skip server cert check
+    mbedtls_ssl_conf_ca_chain( &conf, &cacert, NULL );
+    mbedtls_ssl_conf_rng( &conf, mbedtls_ctr_drbg_random, &ctr_drbg );
+    
+    if( ( ret = mbedtls_ssl_setup( &ssl, &conf ) ) != 0 )
+    {
+        char error_buf[100];
+        mbedtls_strerror( ret, error_buf, 100 );
+        std::ostringstream error_msg;
+        error_msg << "mbedtls_ssl_setup failed with return code " << ret << ": " << error_buf;
+    	throw Exception(Exception::SYNC_GENERIC_ERROR, error_msg.str());
+    }
+
+    if( ( ret = mbedtls_ssl_set_hostname( &ssl, server_name ) ) != 0 )
+    {
+        char error_buf[100];
+        mbedtls_strerror( ret, error_buf, 100 );
+        std::ostringstream error_msg;
+        error_msg << "mbedtls_ssl_set_hostname failed with return code " << ret << ": " << error_buf;
+    	throw Exception(Exception::SYNC_GENERIC_ERROR, error_msg.str());
+    }
+
+    mbedtls_ssl_set_bio( &ssl, &server_fd, mbedtls_net_send, mbedtls_net_recv, NULL );
+
+    while( ( ret = mbedtls_ssl_handshake( &ssl ) ) != 0 )
+    {
+        if( ret != MBEDTLS_ERR_SSL_WANT_READ && ret != MBEDTLS_ERR_SSL_WANT_WRITE )
+        {
+	      	char error_buf[100];
+	        mbedtls_strerror( ret, error_buf, 100 );
+	        std::ostringstream error_msg;
+	        error_msg << "mbedtls_ssl_handshake failed with return code " << ret << ": " << error_buf;
+	    	throw Exception(Exception::SYNC_GENERIC_ERROR, error_msg.str());
+        }
+    }
+
+    // Verify server certificate <== only necessary when MBEDTLS_SSL_VERIFY_OPTIONAL is used above
+	/*uint32_t flags;
+    if( ( flags = mbedtls_ssl_get_verify_result( &ssl ) ) != 0 )
+    {
+        char vrfy_buf[512];
+
+        printf( " failed\n" );
+
+        mbedtls_x509_crt_verify_info( vrfy_buf, sizeof( vrfy_buf ), "  ! ", flags );
+
+        printf( "%s\n", vrfy_buf );
+        // TODO: Throw error!!!!
+    }*/
+
+
+    SSLWriteExactly(&ssl, (unsigned char*)"Hello", 5);
+
+    switch(action) {
+	case CREATE:
+		break;
+	case UPDATE:
+		break;
+	case RESET:
+
+		break;
+    }
+
+    mbedtls_ssl_close_notify( &ssl );
+
+    return output.str();
+}
 	
 /*	def connect_to_sync_server(self, hostname=None, own_ca_data=None):
 		if not hostname:
@@ -287,34 +468,10 @@ string SyncableStorage::Sync()
 	if(!SyncIsAssociated()) {
 		throw Storage::Exception(Storage::Exception::SYNC_NOT_ASSOCIATED);	
 	}
-	return "Not implemented yet.";
+
+	return PerformServerAction(UPDATE);
 }
-		
-	/*def sync_setup(self, hostname, key, own_ca_filename=None):
-		if self.sync_associated():
-			raise SyncError(SyncError.ALREADY_ASSOCIATED)
-	
-		if own_ca_filename:
-			with open(own_ca_filename, 'r') as f:
-				own_ca_data=f.read()
-		else:
-			own_ca_data=None
-		
-	
-		if key:
-			self.config["sync_host"]=hostname
-			self.config["sync_key"]=key
-			self.config["own_ca_data"]=base64.b64encode(own_ca_data) if own_ca_data else None
-			try:
-				return self.sync()
-			except:
-				self.config.pop("sync_host")
-				self.config.pop("sync_key")
-				self.config.pop("own_ca_data")
-				raise
-		else:
-			return self.sync_setup_new_account(hostname, key, own_ca_data) */
-	
+
 	/*def sync_setup_new_account(self, hostname, key, own_ca_data):
 		msg=""
 		key=Random.new().read(256/8)
@@ -425,7 +582,7 @@ string SyncableStorage::Sync()
 
 
 string SyncableStorage::SyncGetKey() {
-
+	return "???";
 }
 
 /*	

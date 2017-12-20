@@ -1,5 +1,6 @@
 #pragma once
 
+#define ERR_MSG_LENGTH 256
 
 
 #include <fstream>
@@ -92,6 +93,8 @@ class Storage {
 				const char* what() const throw();
 			private:
 				enum Err errCode;
+				bool returnCustomErrMsg;
+				char errMsg[ERR_MSG_LENGTH];
 				std::string explaination;
 		};
 

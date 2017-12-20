@@ -9,6 +9,9 @@
 
 #include "Storage.hpp"
 
+#include "mbedtls/ssl.h"
+
+
 class SyncableStorage : public Storage {
 	public:
 		SyncableStorage(std::string filename) : Storage(filename) {}
@@ -41,6 +44,15 @@ class SyncableStorage : public Storage {
 	protected:
 		std::string GetBToken(std::string key);
 		void PutBToken(std::string btoken, std::string key);
+
+		enum ServerAction {
+			CREATE, UPDATE, RESET
+		};
+
+		std::string PerformServerAction(enum SyncableStorage::ServerAction action);
+
+		int SSLWriteExactly(mbedtls_ssl_context *ssl, const unsigned char *buf, size_t len);
+		int SSLReadExactly(mbedtls_ssl_context *ssl, const unsigned char *buf, size_t len);
 
 
 		constexpr static const char *handshake1 = "passmate-server-protocol";
