@@ -52,11 +52,9 @@ class SyncableStorage : public Storage {
 		std::string PerformServerAction(enum SyncableStorage::ServerAction action);
 
 		int SSLWriteExactly(mbedtls_ssl_context *ssl, const unsigned char *buf, size_t len);
-		int SSLReadExactly(mbedtls_ssl_context *ssl, const unsigned char *buf, size_t len);
+		int SSLReadExactly(mbedtls_ssl_context *ssl, unsigned char *buf, size_t len);
 
-
-		constexpr static const char *handshake1 = "passmate-server-protocol";
-		constexpr static const char *handshake2 = "passmate-protocol-server";
-
-
+		void CommunicateCreate(mbedtls_ssl_context *ssl);
+		void CommunicateUpdate(mbedtls_ssl_context *ssl);
+		void CommunicateReset(mbedtls_ssl_context *ssl);
 };

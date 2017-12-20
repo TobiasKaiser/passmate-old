@@ -28,6 +28,7 @@ bool Application::OnInit() {
     //    return false;
     //}
 
+	/*
 	string myStr = SyncableStorage::pack_key("12345678", "abcdabcdabcdabcdabcdabcdabcdabcd");
 
 	string accno, enckey;
@@ -38,7 +39,7 @@ bool Application::OnInit() {
 
 	cout << "accno: " << accno << endl;
 	cout << "enckey: " << enckey << endl;
-
+	*/
 
 
 	cxxopts::Options options("passmate", "passmate -- Password manager");

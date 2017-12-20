@@ -131,7 +131,7 @@ void Storage::InitCryptoStuff() {
    		cout << "error" << endl;
     }
 
-   	cout << "init crypt stuff done" << endl;
+   	//cout << "init crypt stuff done" << endl;
 
 	
 }

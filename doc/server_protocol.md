@@ -23,7 +23,7 @@ Through the create action the client requests to store a new btoken on the serve
 |                  |                | ...|
 | client -> server | 32             | auth token |
 | client -> server | 4              | btoken length Ls (uint32_t in big endian) |
-| client -> server | Ls              | btoken to be stored on server |
+| client -> server | Ls             | btoken to be stored on server |
 | server -> client | 8              | new account no. (8 byte random string) |
 | server -> client |                | server closes connection |
 

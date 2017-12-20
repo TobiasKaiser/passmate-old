@@ -184,37 +184,36 @@ bool SyncableStorage::SyncIsAssociated()
 				ret+=new
 		return ret */
 
-int SyncableStorage::SSLReadExactly(mbedtls_ssl_context *ssl, const unsigned char *buf, size_t len)
+int SyncableStorage::SSLReadExactly(mbedtls_ssl_context *ssl, unsigned char *buf, size_t len)
 {
-	/*
-    do
-    {
-        len = sizeof( buf ) - 1;
-        memset( buf, 0, sizeof( buf ) );
-        ret = mbedtls_ssl_read( &ssl, buf, len );
+	int ret;
+	int len_remaining = len;
+	while(len_remaining > 0) {
+		ret = mbedtls_ssl_read(ssl, buf, len_remaining);
 
-        if( ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_WANT_WRITE )
+        if( ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_WANT_WRITE ) {
             continue;
-
-        if( ret == MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY )
-            break;
-
-        if( ret < 0 )
-        {
-            printf( "failed\n  ! mbedtls_ssl_read returned %d\n\n", ret );
-            break;
+        }
+        else if( ret == MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY ) {
+        	throw Exception(Exception::SYNC_UNEXPECTED_COMMUNICATION_END);
+        }
+		else if( ret == 0 ) { // End of file
+            throw Exception(Exception::SYNC_UNEXPECTED_COMMUNICATION_END);
+        }
+        else if( ret < 0 ) {
+            char error_buf[100];
+	        mbedtls_strerror( ret, error_buf, 100 );
+	        std::ostringstream error_msg;
+	        error_msg << "mbedtls_ssl_read failed with return code " << ret << ": " << error_buf;
+	    	throw Exception(Exception::SYNC_GENERIC_ERROR, error_msg.str());
         }
 
-        if( ret == 0 )
-        {
-            printf( "\n\nEOF\n\n" );
-            break;
-        }
-
-        len = ret;
-        printf( " %d bytes read\n\n%s", len, (char *) buf );
+        len_remaining -= ret;
+        buf += ret;
     }
-    while( 1 );*/
+    if(len_remaining != 0) {
+    	throw Exception(Exception::SYNC_GENERIC_ERROR, "Unable to read requested amount of data.");
+    }
     return len;
 }
 
@@ -223,9 +222,16 @@ int SyncableStorage::SSLWriteExactly(mbedtls_ssl_context *ssl, const unsigned ch
 	int ret;
 
 	while( ( ret = mbedtls_ssl_write( ssl, buf, len ) ) <= 0 ) {
-	    if( ret != MBEDTLS_ERR_SSL_WANT_READ && ret != MBEDTLS_ERR_SSL_WANT_WRITE ) {
+	    if( ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_WANT_WRITE ) {
 	    	// in these cases we should try again. there might be some non-blocking weridness going on.
-	        printf( " failed\n  ! mbedtls_ssl_write returned %d\n\n", ret );
+	    }
+	    else {
+	    	char error_buf[100];
+	        mbedtls_strerror( ret, error_buf, 100 );
+	        std::ostringstream error_msg;
+	        error_msg << "mbedtls_ssl_write failed with return code " << ret << ": " << error_buf;
+	    	throw Exception(Exception::SYNC_GENERIC_ERROR, error_msg.str());
+        
 	        break;
 	    }
 	}
@@ -233,6 +239,20 @@ int SyncableStorage::SSLWriteExactly(mbedtls_ssl_context *ssl, const unsigned ch
 	// TODO: Make sure ret is always either negative or equal to len! (partial writes are possible with mbedtls_ssl_write)
 }
 
+void SyncableStorage::CommunicateCreate(mbedtls_ssl_context *ssl)
+{
+	throw Exception(Exception::NOT_IMPLEMENTED);
+}
+
+void SyncableStorage::CommunicateUpdate(mbedtls_ssl_context *ssl)
+{
+	throw Exception(Exception::NOT_IMPLEMENTED);
+}
+
+void SyncableStorage::CommunicateReset(mbedtls_ssl_context *ssl)
+{
+	throw Exception(Exception::NOT_IMPLEMENTED);	
+}
 
 string SyncableStorage::PerformServerAction(enum SyncableStorage::ServerAction action)
 {
@@ -360,22 +380,35 @@ string SyncableStorage::PerformServerAction(enum SyncableStorage::ServerAction a
     }*/
 
 
-    SSLWriteExactly(&ssl, (unsigned char*)"Hello", 5);
+	static const char *handshake1 = "passmate-server-protocol";
+	static const char *handshake2 = "passmate-protocol-server";
+
+
+    SSLWriteExactly(&ssl, (unsigned char*) handshake1, 24);
+    char handshake_recvd[24];
+    SSLReadExactly(&ssl, (unsigned char*) handshake_recvd, 24);
+
+    if(memcmp(handshake_recvd, handshake2,24) != 0) {
+    	throw Exception(Exception::SYNC_SERVER_ERROR);
+    }
 
     switch(action) {
-	case CREATE:
-		break;
-	case UPDATE:
-		break;
-	case RESET:
-
-		break;
+		case CREATE:
+			CommunicateCreate(&ssl);
+			break;
+		case UPDATE:
+			CommunicateUpdate(&ssl);
+			break;
+		case RESET:
+			CommunicateReset(&ssl);
+			break;
     }
 
     mbedtls_ssl_close_notify( &ssl );
 
     return output.str();
 }
+
 	
 /*	def connect_to_sync_server(self, hostname=None, own_ca_data=None):
 		if not hostname:
