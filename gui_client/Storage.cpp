@@ -327,6 +327,23 @@ void Storage::Save()
 
 }
 
+std::string Storage::EncryptDataWithoutConfig()
+{
+	// Untested so far
+	string json_str = data.dump();
+
+	vector<char> outbuf(json_str.length()+128);
+
+	ScryptEncCtx enc(&my_prng_ctx);
+
+	// This will throw a Storage:Exception in case something goes wrong		
+	enc.encrypt((const uint8_t *) json_str.c_str(), json_str.length(), (uint8_t *) &outbuf[0], (const uint8_t *) passphrase.c_str(), passphrase.length(), 16*1024*1024, 0.5, 3.0);
+
+	std::string ret(outbuf.begin(), outbuf.end());
+
+	return ret;
+}
+
 /*
 	def encrypt_data_without_config(self):
 		cleartext=json.dumps(self.data)
@@ -335,6 +352,7 @@ void Storage::Save()
 			maxtime=2.5, maxmem=0, maxmemfrac=0.5)
 		return ciphertext
 */
+
 
 /*	
 	def path_of_record(self, record):
@@ -349,11 +367,26 @@ void Storage::Save()
 					path=None
 		return path
 */
-/*
-json Storage::MergeRecords(const json &local, const json &remote, const string &rid) {
+
+int Storage::MergeRecords_InsertSort(json &dest_array, const json &item)
+{
 
 }
-*/
+
+json Storage::MergeRecords(const json &local, const json &remote, const string &rid, ostringstream &report)
+{
+	json out = json::array();
+
+	for(auto iter = local.begin(); iter != local.end(); ++iter) {
+		MergeRecords_InsertSort(out, *iter);
+	} 
+
+	for(auto iter = remote.begin(); iter != remote.end(); ++iter) {
+		MergeRecords_InsertSort(out, *iter);	
+	} 
+
+	return out;
+}
 /*
 	def merge_records(self, local, remote, rid):
 		local_s=set(map(tuple, local))
@@ -369,6 +402,40 @@ json Storage::MergeRecords(const json &local, const json &remote, const string &
 		
 		return new, MergeReportItem(rid=rid, push=pushed, pull=pulled, path=self.path_of_record(new))
 */
+
+string Storage::Merge(json merge_input)
+{
+	ostringstream report;
+
+	json new_data;
+
+	// 1. Iterate over local RIDs
+
+	for(auto record_it = data.begin(); record_it != data.end(); record_it++) {
+		string record_id = record_it.key();
+		json field_array = record_it.value();
+
+		// BIG TODO HERE
+		//		if RID not in remote, just keep local record
+		//		else, merge with remote record and add to result and remove remote record from merge_input
+		//		check for path conflict
+	}
+
+
+	// 2. Add remaining record in merge_input to result, possibly calling merge anyways.
+	for(auto record_it = merge_input.begin(); record_it != merge_input.end(); record_it++) {
+		string record_id = record_it.key();
+		json field_array = record_it.value();
+
+		// BIG TODO HERE
+		// 		check for path conflict
+
+	}
+
+	data = new_data;
+
+	return report.str();
+}
 
 /*	
 	def merge(self, merge_input):
@@ -401,13 +468,36 @@ json Storage::MergeRecords(const json &local, const json &remote, const string &
 		return merge_report
 */
 
+
+string Storage::DecryptAndMergeDataWithoutConfig(string ciphertext)
+{
+	// 1. decrypt ciphertext with scrypt
+	ScryptDecCtx dec(true);
+
+	if(ciphertext.length()-128 < 0) {
+		throw Exception(Exception::CRYPTO_ERROR);	
+	}
+
+	vector<char> outbuf(ciphertext.length()-128);
+	
+	// This throws an Storage::Exception in many cases.		
+	dec.decrypt((const uint8_t *) ciphertext.c_str(), ciphertext.length(), (uint8_t *) &outbuf[0], NULL, (const uint8_t *) passphrase.c_str(), passphrase.length(), 16*1024*1024, 0.5, 6);
+
+	string cleartext(outbuf.begin(),outbuf.end());
+
+	// 2. Convert to JSON
+	json json_in = json::parse(cleartext);
+	
+	// 3. Merge
+	return Merge(json_in);
+}
+
 /*
 	def decrypt_and_merge_data_without_config(self, ciphertext):
 		cleartext=scrypt.decrypt(ciphertext, self.passphrase)
 		json_in=json.loads(cleartext)
 		return self.merge(json_in)
 */
-
 
 /**************************************************************************
  * Here comes the real core stuff

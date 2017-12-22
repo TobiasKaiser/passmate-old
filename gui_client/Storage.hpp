@@ -121,4 +121,11 @@ class Storage {
 
     	bool paranoidFileBackup;
 
+    	std::string EncryptDataWithoutConfig();
+    	std::string DecryptAndMergeDataWithoutConfig(std::string ciphertext);
+    	
+    	std::string Merge(nlohmann::json merge_input);
+		nlohmann::json MergeRecords(const nlohmann::json &local, const nlohmann::json &remote, const std::string &rid, std::ostringstream &report);
+		int MergeRecords_InsertSort(nlohmann::json &dest_array, const nlohmann::json &item);
+
 };
