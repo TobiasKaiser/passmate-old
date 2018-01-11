@@ -35,12 +35,15 @@ class SyncableStorage : public Storage {
 		// Synchronize password storage with server
 		std::string Sync();
 
+	protected:
+		
 		static void unpack_key(const std::string &key, std::string &account_no, std::string &enckey);
 		static uint16_t crc16(const uint8_t *data, size_t len);
 		static std::string pack_key(const std::string &account_no, const std::string &enckey);
-	protected:
+	
+
 		std::string GetBToken(std::string key);
-		void PutBToken(std::string btoken, std::string key);
+		std::string PutBToken(std::string btoken, std::string key);
 
 		enum ServerAction {
 			CREATE, UPDATE, RESET
@@ -50,11 +53,12 @@ class SyncableStorage : public Storage {
 
 		std::string SyncDeleteFromServer();
 
+		void DeriveKeys(const std::string &enckey, std::string &aes_data_key, std::string &hmac_key, std::string &auth_token);
 
 		int SSLWriteExactly(mbedtls_ssl_context *ssl, const unsigned char *buf, size_t len);
 		int SSLReadExactly(mbedtls_ssl_context *ssl, unsigned char *buf, size_t len);
 
-		void CommunicateCreate(mbedtls_ssl_context *ssl);
-		void CommunicateUpdate(mbedtls_ssl_context *ssl);
-		void CommunicateReset(mbedtls_ssl_context *ssl);
+		void CommunicateCreate(mbedtls_ssl_context *ssl, std::ostringstream &output);
+		void CommunicateUpdate(mbedtls_ssl_context *ssl, std::ostringstream &output);
+		void CommunicateReset(mbedtls_ssl_context *ssl, std::ostringstream &output);
 };
