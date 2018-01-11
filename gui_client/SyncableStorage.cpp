@@ -145,7 +145,7 @@ string SyncableStorage::GetBToken(string key)
 
 void SyncableStorage::PutBToken(string btoken, string key)
 {
-
+	cout << "Put btoken..." << endl;
 }
 
 
@@ -169,20 +169,6 @@ bool SyncableStorage::SyncIsAssociated()
 {
 	return (config.count("sync_host") > 0) && (config.count("sync_key") > 0);
 }
-
-/*	def sync_associated(self):
-		return "sync_host" in self.config
-*/
-
-/*	def read_exactly(self, sock, nbytes):
-		ret=""
-		while len(ret)!=nbytes:
-			new=sock.read(nbytes-len(ret))
-			if len(new)==0: # eof
-				raise SyncError(SyncError.UNEXPECTED_COMMUNICATION_END)
-			else:
-				ret+=new
-		return ret */
 
 int SyncableStorage::SSLReadExactly(mbedtls_ssl_context *ssl, unsigned char *buf, size_t len)
 {
@@ -238,6 +224,38 @@ int SyncableStorage::SSLWriteExactly(mbedtls_ssl_context *ssl, const unsigned ch
 	return ret;
 	// TODO: Make sure ret is always either negative or equal to len! (partial writes are possible with mbedtls_ssl_write)
 }
+
+
+	/*
+	def sync_setup_new_account(self, hostname, key, own_ca_data):
+		msg=""
+		key=Random.new().read(256/8)
+		_, _, auth_token=self.all_keys(key)
+	
+		sock, server_protocol_version, banner=self.connect_to_sync_server(hostname, own_ca_data)
+		try:
+			if server_protocol_version!=1:
+				raise SyncError(SyncError.SERVER_PROTOCOL_VERSION_MISMATCH)
+			msg+="Remote reports:\n"+banner
+		
+			btoken=self.get_btoken(key)
+			sock.write('c' + auth_token + struct.pack("!L", len(btoken)))
+			sock.write(btoken)
+			
+			account_no=struct.unpack("!8s",self.read_exactly(sock, 8))[0]
+			
+			if account_no=="\0\0\0\0\0\0\0\0":
+				raise SyncError(SyncError.SERVER_ERROR)
+		finally:
+			sock.close()
+			
+		self.config["sync_host"]=hostname
+		self.config["sync_key"]=pack_key(account_no, key)
+		self.config["own_ca_data"]=base64.b64encode(own_ca_data) if own_ca_data else None
+		self.changed=True
+		msg+="success!\n"
+		return msg
+	*/
 
 void SyncableStorage::CommunicateCreate(mbedtls_ssl_context *ssl)
 {
@@ -388,6 +406,33 @@ string SyncableStorage::PerformServerAction(enum SyncableStorage::ServerAction a
     char handshake_recvd[24];
     SSLReadExactly(&ssl, (unsigned char*) handshake_recvd, 24);
 
+    uint16_t server_protocol_version_n, server_protocol_version; // _n is for network byte order
+    uint32_t banner_length_n, banner_length;
+
+    SSLReadExactly(&ssl, (unsigned char *) &server_protocol_version_n, 2);
+
+    server_protocol_version = ntohs(server_protocol_version_n);
+
+    if(server_protocol_version != 1) {
+    	throw Exception(Exception::SYNC_SERVER_PROTOCOL_VERSION_MISMATCH);
+    }
+
+    SSLReadExactly(&ssl, (unsigned char *) &banner_length_n, 4);
+
+    banner_length = ntohl(banner_length_n);
+
+    if(banner_length > 32 * 1024) {
+    	throw Exception(Exception::SYNC_GENERIC_ERROR, "Banner length exceeds maximum banner length.");
+    }
+
+    vector<char> banner_vect(banner_length);
+
+    SSLReadExactly(&ssl, (unsigned char *) &banner_vect[0], banner_length);
+
+ 	std::string banner(banner_vect.begin(),banner_vect.end());
+
+ 	output << "Banner received:" << endl << banner << endl;
+
     if(memcmp(handshake_recvd, handshake2,24) != 0) {
     	throw Exception(Exception::SYNC_SERVER_ERROR);
     }
@@ -408,42 +453,6 @@ string SyncableStorage::PerformServerAction(enum SyncableStorage::ServerAction a
 
     return output.str();
 }
-
-	
-/*	def connect_to_sync_server(self, hostname=None, own_ca_data=None):
-		if not hostname:
-			hostname=self.config["sync_host"]
-			if not own_ca_data: # only if hostname is not set!
-				own_ca_data=base64.b64decode(self.config["own_ca_data"]) if self.config["own_ca_data"] else None
-	
-		sock_raw = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		
-		ca_certs_filename="/etc/ssl/certs/ca-certificates.crt"
-		if own_ca_data:
-			tf=tempfile.NamedTemporaryFile()
-			tf.write(own_ca_data)
-			tf.flush()
-			ca_certs_filename=tf.name
-		
-		sock = ssl.wrap_socket(sock_raw, ca_certs=ca_certs_filename, cert_reqs=ssl.CERT_REQUIRED)
-		try:
-			sock.connect((hostname, 29556))
-			
-			if own_ca_data:
-				tf.close() # also deletes the temporary file
-		
-			sock.write(self._handshake1)
-			if self.read_exactly(sock, len(self._handshake2))!=self._handshake2:
-				raise SyncError(SyncError.SERVER_ERROR)
-		
-			server_protocol_version, banner_length=struct.unpack("!HL", self.read_exactly(sock, 6))
-			banner=self.read_exactly(sock, banner_length)
-		
-			
-		except:
-			sock.close()
-			raise
-		return sock, server_protocol_version, banner */
 		
 string SyncableStorage::SyncSetup(string hostname, string key)
 {
@@ -464,7 +473,8 @@ string SyncableStorage::SyncSetupNewAccount(string hostname)
 	if(SyncIsAssociated()) {
 		throw Storage::Exception(Storage::Exception::SYNC_ALREADY_ASSOCIATED);	
 	}
-	return "Not implemented yet.";
+
+	return PerformServerAction(CREATE);
 }
 
 string SyncableStorage::SyncDeleteFromServer()
@@ -472,14 +482,20 @@ string SyncableStorage::SyncDeleteFromServer()
 	if(!SyncIsAssociated()) {
 		throw Storage::Exception(Storage::Exception::SYNC_NOT_ASSOCIATED);	
 	}
-	return "Not implemented yet.";
+
+	return PerformServerAction(RESET);
 }
 
-string SyncableStorage::SyncReset()
+string SyncableStorage::SyncReset(bool delete_from_server)
 {
+	string msg="";
 	if(!SyncIsAssociated()) {
 		throw Storage::Exception(Storage::Exception::SYNC_NOT_ASSOCIATED);	
 	}
+
+	if(delete_from_server) {
+		msg = SyncDeleteFromServer();
+	} 
 
 	if(config.count("sync_key")) {
 		config.erase("sync_key");	
@@ -493,8 +509,9 @@ string SyncableStorage::SyncReset()
 
 	changed = true;
 	
-	return "Not implemented yet.";
+	return msg;
 }
+
 
 string SyncableStorage::Sync()
 {
@@ -504,35 +521,6 @@ string SyncableStorage::Sync()
 
 	return PerformServerAction(UPDATE);
 }
-
-	/*def sync_setup_new_account(self, hostname, key, own_ca_data):
-		msg=""
-		key=Random.new().read(256/8)
-		_, _, auth_token=self.all_keys(key)
-	
-		sock, server_protocol_version, banner=self.connect_to_sync_server(hostname, own_ca_data)
-		try:
-			if server_protocol_version!=1:
-				raise SyncError(SyncError.SERVER_PROTOCOL_VERSION_MISMATCH)
-			msg+="Remote reports:\n"+banner
-		
-			btoken=self.get_btoken(key)
-			sock.write('c' + auth_token + struct.pack("!L", len(btoken)))
-			sock.write(btoken)
-			
-			account_no=struct.unpack("!8s",self.read_exactly(sock, 8))[0]
-			
-			if account_no=="\0\0\0\0\0\0\0\0":
-				raise SyncError(SyncError.SERVER_ERROR)
-		finally:
-			sock.close()
-			
-		self.config["sync_host"]=hostname
-		self.config["sync_key"]=pack_key(account_no, key)
-		self.config["own_ca_data"]=base64.b64encode(own_ca_data) if own_ca_data else None
-		self.changed=True
-		msg+="success!\n"
-		return msg*/
 	
 	/*
 	def sync_delete_from_server(self):
@@ -597,31 +585,11 @@ string SyncableStorage::Sync()
 		return msg
 */
 
-/*	
-	def sync_reset(self, delete_from_server):
-		if not self.sync_associated():
-			raise SyncError(SyncError.NOT_ASSOCIATED)
-		msg=""
-		
-		if delete_from_server:
-			msg+=self.sync_delete_from_server()
-		
-		self.config.pop("sync_host")
-		self.config.pop("sync_key")
-		self.config.pop("own_ca_data")
-		
-		return msg
-*/
-
-
-string SyncableStorage::SyncGetKey() {
-	return "???";
+string SyncableStorage::SyncGetKey()
+{
+	if(!SyncIsAssociated()) {
+		throw Storage::Exception(Storage::Exception::SYNC_NOT_ASSOCIATED);	
+	}
+	
+	return config["sync_key"];
 }
-
-/*	
-	def sync_showkey(self):
-		if not self.sync_associated():
-			raise SyncError(SyncError.NOT_ASSOCIATED)
-		
-		return self.config["sync_key"]
-*/

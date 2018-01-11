@@ -913,7 +913,7 @@ void MainWindow::OnSyncDeleteFromServer(wxCommandEvent &evt)
     }
  
     try {
-        string summary = st.SyncDeleteFromServer();
+        string summary = st.SyncReset(true);
         wxMessageDialog errDialog(NULL, wxString("Sync delete from server summary:\n"+ summary), wxT("Summary"), wxOK|wxCENTRE);
         errDialog.ShowModal();
 
@@ -942,7 +942,7 @@ void MainWindow::OnSyncReset(wxCommandEvent &evt)
     }
 
     try {
-        string summary = st.SyncReset();
+        string summary = st.SyncReset(false);
         wxMessageDialog errDialog(NULL, wxString("Sync reset summary:\n"+ summary), wxT("Summary"), wxOK|wxCENTRE);
         errDialog.ShowModal();
 

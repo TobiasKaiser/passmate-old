@@ -7,6 +7,7 @@ Connect via TCP port 29556 (from ASCII 'st') through TLS.
 | ---------------- | -------------- | ------- |   
 | client -> server | 24 			| "passmate-server-protocol" |
 | server -> client | 24 			| "passmate-protocol-server" |
+| server -> client | 2 				| server protocol version (currently this is 1) |
 | server -> client | 4 				| banner length B (uint32_t in big endian) |
 | server -> client | B 				| server banner |
 | client -> server | 1 				| Requested action. 'c' to create, 'u' for update, 'r' for reset |

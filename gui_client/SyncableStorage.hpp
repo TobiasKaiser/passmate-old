@@ -29,11 +29,8 @@ class SyncableStorage : public Storage {
 		// Setup: Create new account
 		std::string SyncSetupNewAccount(std::string hostname);
 		
-		// Deassociate and delete all data from server
-		std::string SyncDeleteFromServer();
-
-		// Deassociate but keep all data on server
-		std::string SyncReset();
+		// Deassociate from server and keep or delete data on server:
+		std::string SyncReset(bool delete_from_server);
 
 		// Synchronize password storage with server
 		std::string Sync();
@@ -50,6 +47,9 @@ class SyncableStorage : public Storage {
 		};
 
 		std::string PerformServerAction(enum SyncableStorage::ServerAction action);
+
+		std::string SyncDeleteFromServer();
+
 
 		int SSLWriteExactly(mbedtls_ssl_context *ssl, const unsigned char *buf, size_t len);
 		int SSLReadExactly(mbedtls_ssl_context *ssl, unsigned char *buf, size_t len);
