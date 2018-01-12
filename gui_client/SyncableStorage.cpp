@@ -131,23 +131,23 @@ void SyncableStorage::DeriveKeys(const string &enckey, string &aes_data_key, str
 	
 	mbedtls_md_init(&hctx);  
 	mbedtls_md_setup(&hctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 1);
-	mbedtls_md_hmac_starts(&hctx, (const unsigned char *) enckey.c_str(), 32);
+	mbedtls_md_hmac_starts(&hctx, (const unsigned char *) &enckey[0], 32);
 	mbedtls_md_hmac_update(&hctx, (const unsigned char *) aes_data_key_src.c_str(), aes_data_key_src.length());    
-	mbedtls_md_hmac_finish(&hctx, (unsigned char *) &aes_data_key[0]);
+	mbedtls_md_hmac_finish(&hctx, (unsigned char *) &aes_data_key_vect[0]);
 	mbedtls_md_free(&hctx);
 
 	mbedtls_md_init(&hctx);  
 	mbedtls_md_setup(&hctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 1);
-	mbedtls_md_hmac_starts(&hctx, (const unsigned char *) enckey.c_str(), 32);
-	mbedtls_md_hmac_update(&hctx, (const unsigned char *) aes_data_key_src.c_str(), aes_data_key_src.length());    
-	mbedtls_md_hmac_finish(&hctx, (unsigned char *) &aes_data_key[0]);
+	mbedtls_md_hmac_starts(&hctx, (const unsigned char *) &enckey[0], 32);
+	mbedtls_md_hmac_update(&hctx, (const unsigned char *) hmac_key_src.c_str(), hmac_key_src.length());    
+	mbedtls_md_hmac_finish(&hctx, (unsigned char *) &hmac_key_vect[0]);
 	mbedtls_md_free(&hctx);
 
 	mbedtls_md_init(&hctx);  
 	mbedtls_md_setup(&hctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 1);
-	mbedtls_md_hmac_starts(&hctx, (const unsigned char *) enckey.c_str(), 32);
-	mbedtls_md_hmac_update(&hctx, (const unsigned char *) aes_data_key_src.c_str(), aes_data_key_src.length());    
-	mbedtls_md_hmac_finish(&hctx, (unsigned char *) &aes_data_key[0]);
+	mbedtls_md_hmac_starts(&hctx, (const unsigned char *) &enckey[0], 32);
+	mbedtls_md_hmac_update(&hctx, (const unsigned char *)auth_token_src.c_str(), auth_token_src.length());    
+	mbedtls_md_hmac_finish(&hctx, (unsigned char *) &auth_token_vect[0]);
 	mbedtls_md_free(&hctx);
 
 	string aes_data_key_new(aes_data_key_vect.begin(), aes_data_key_vect.end());
@@ -161,8 +161,7 @@ void SyncableStorage::DeriveKeys(const string &enckey, string &aes_data_key, str
 
 string SyncableStorage::GetBToken(string key)
 {
-
-	return "";	
+	return "test token";	
 }
 /*	def get_btoken(self, key):
 		aes_data_key, hmac_key, _=self.all_keys(key)
@@ -261,22 +260,8 @@ int SyncableStorage::SSLWriteExactly(mbedtls_ssl_context *ssl, const unsigned ch
 	// TODO: Make sure ret is always either negative or equal to len! (partial writes are possible with mbedtls_ssl_write)
 }
 
-
 	/*
-	def sync_setup_new_account(self, hostname, key, own_ca_data):
-		msg=""
-		key=Random.new().read(256/8)
-		_, _, auth_token=self.all_keys(key)
-	
-		sock, server_protocol_version, banner=self.connect_to_sync_server(hostname, own_ca_data)
-		try:
-			if server_protocol_version!=1:
-				raise SyncError(SyncError.SERVER_PROTOCOL_VERSION_MISMATCH)
-			msg+="Remote reports:\n"+banner
 		
-			btoken=self.get_btoken(key)
-			sock.write('c' + auth_token + struct.pack("!L", len(btoken)))
-			sock.write(btoken)
 			
 			account_no=struct.unpack("!8s",self.read_exactly(sock, 8))[0]
 			
@@ -301,8 +286,39 @@ void SyncableStorage::CommunicateCreate(mbedtls_ssl_context *ssl, ostringstream 
 		throw Storage::Exception(Storage::Exception::SYNC_ALREADY_ASSOCIATED);	
 	}
 
+	vector<char> enckey_vect(32);
+	mbedtls_ctr_drbg_random(&my_prng_ctx, (unsigned char *) &enckey_vect[0], 32);
 
-	throw Exception(Exception::NOT_IMPLEMENTED);
+	string enckey(enckey_vect.begin(), enckey_vect.end());
+
+	string aes_data_key, hmac_key, auth_token;
+	DeriveKeys(enckey, aes_data_key, hmac_key, auth_token);
+
+	// Send command
+	char command = 'c'; // c = update
+    SSLWriteExactly(ssl, (unsigned char*) &command, 1);
+
+	// Send auth token to server. We will then receive an account no from server.
+	SSLWriteExactly(ssl, (unsigned char*) auth_token.c_str(), auth_token.length());
+
+    // Send btoken
+	string btoken_send = GetBToken(enckey);
+	uint32_t len_btoken_send = htonl(btoken_send.length());
+	SSLWriteExactly(ssl, (unsigned char *) &len_btoken_send, 4);
+	SSLWriteExactly(ssl, (unsigned char *) btoken_send.c_str(), btoken_send.length());
+
+	// Receive account no as confirmation
+	vector<char> account_no_recv_vect(8);
+	vector<char> account_no_failure_vect(8);
+	memset(&account_no_failure_vect[0], 0, 8); // TODO: make this a bit more c++y
+
+	SSLReadExactly(ssl, (unsigned char *) &account_no_recv_vect[0], 8);
+	string account_no_recv(account_no_recv_vect.begin(), account_no_recv_vect.end());
+	if(account_no_recv_vect == account_no_failure_vect) {
+		throw Storage::Exception(Storage::Exception::SYNC_SERVER_ERROR);
+	}
+
+	config["sync_key"] = pack_key(account_no_recv, enckey);
 }
 	
 
@@ -319,93 +335,71 @@ void SyncableStorage::CommunicateUpdate(mbedtls_ssl_context *ssl, ostringstream 
 	string aes_data_key, hmac_key, auth_token;
 	DeriveKeys(enckey, aes_data_key, hmac_key, auth_token);
 
-	char command = 'u';
-
+	// Send command
+	char command = 'u'; // u = update
     SSLWriteExactly(ssl, (unsigned char*) &command, 1);
 
+    // Send account no and auth token
 	SSLWriteExactly(ssl, (unsigned char*) account_no.c_str(), account_no.length());
-
 	SSLWriteExactly(ssl, (unsigned char*) auth_token.c_str(), auth_token.length());
 
-
+	// Receive btoken
 	uint32_t len_btoken_recv_n, len_btoken_recv;
-
 	SSLReadExactly(ssl, (unsigned char *) &len_btoken_recv_n, 4);
-
     len_btoken_recv = ntohl(len_btoken_recv_n);
-
     if(len_btoken_recv > 32 * 1024 * 1024) {
     	throw Storage::Exception(Storage::Exception::SYNC_GENERIC_ERROR, "Btoken size received exceeds btoken size limit.");
     }
-
     vector<char> btoken_recv_vect(len_btoken_recv);
-
     SSLReadExactly(ssl, (unsigned char *) &btoken_recv_vect[0], len_btoken_recv);
-
     string btoken_recv(btoken_recv_vect.begin(), btoken_recv_vect.end());
+    output << "========================================" << endl;
+    output << PutBToken(btoken_recv, enckey); // TODO: Improve reporting
 
 
-    output << PutBToken(btoken_recv, enckey);
-
-	/*
-		report=self.put_btoken(btoken_recv, key)
-		msg+="="*64+'\n'
-		if len(report)>0:
-			msg+=string.join(map(lambda x: x.lineformat(), report), "\n")
-		else:
-			msg+="All records up-to-date."
-	*/
-
+    // Send btoken
 	string btoken_send = GetBToken(enckey);
-
 	uint32_t len_btoken_send = htonl(btoken_send.length());
-
 	SSLWriteExactly(ssl, (unsigned char *) &len_btoken_send, 4);
-
 	SSLWriteExactly(ssl, (unsigned char *) btoken_send.c_str(), btoken_send.length());
 
-	vector<char> account_no_recv_vect(8); 
-	
+	// Receive account no as confirmation
+	vector<char> account_no_recv_vect(8); 	
 	SSLReadExactly(ssl, (unsigned char *) &account_no_recv_vect[0], 8);
-
 	string account_no_recv(account_no_recv_vect.begin(), account_no_recv_vect.end());
-
 	if(account_no_recv != account_no) {
 		throw Storage::Exception(Storage::Exception::SYNC_SERVER_ERROR);
 	}
 }
 
 	
-	/*
-	def sync_delete_from_server(self):
-		msg=""
-		account_no, key = unpack_key(self.config["sync_key"])
-		_, _, auth_token=self.all_keys(key)
-		
-		sock, server_protocol_version, banner=self.connect_to_sync_server()
-		try:
-			if server_protocol_version!=1:
-				raise SyncError(SyncError.SERVER_PROTOCOL_VERSION_MISMATCH)
-			msg+="Remote reports:\n"+banner
-		
-			sock.write('r' + account_no + auth_token)
-			
-			account_no_recv=struct.unpack("!8s",self.read_exactly(sock, 8))[0]
-			
-			if account_no_recv!=account_no:
-				raise SyncError(SyncError.SERVER_ERROR)
-		finally:
-			sock.close()
-	
-		return msg
-	*/
 void SyncableStorage::CommunicateReset(mbedtls_ssl_context *ssl, ostringstream &output)
 {
 	if(!SyncIsAssociated()) {
 		throw Storage::Exception(Storage::Exception::SYNC_NOT_ASSOCIATED);	
 	}
 
-	throw Exception(Exception::NOT_IMPLEMENTED);	
+	string account_no, enckey;
+	unpack_key(config["sync_key"], account_no, enckey);
+
+	string aes_data_key, hmac_key, auth_token;
+	DeriveKeys(enckey, aes_data_key, hmac_key, auth_token);
+
+	// Send command
+	char command = 'r'; // r = reset
+    SSLWriteExactly(ssl, (unsigned char*) &command, 1);
+
+    // Send account no and auth token
+	SSLWriteExactly(ssl, (unsigned char*) account_no.c_str(), account_no.length());
+	SSLWriteExactly(ssl, (unsigned char*) auth_token.c_str(), auth_token.length());
+
+	// Receive account no as confirmation
+	vector<char> account_no_recv_vect(8); 	
+	SSLReadExactly(ssl, (unsigned char *) &account_no_recv_vect[0], 8);
+	string account_no_recv(account_no_recv_vect.begin(), account_no_recv_vect.end());
+	if(account_no_recv != account_no) {
+		throw Storage::Exception(Storage::Exception::SYNC_SERVER_ERROR);
+	}
 }
 
 string SyncableStorage::PerformServerAction(enum SyncableStorage::ServerAction action)
@@ -610,7 +604,14 @@ string SyncableStorage::SyncSetupNewAccount(string hostname)
 		throw Storage::Exception(Storage::Exception::SYNC_ALREADY_ASSOCIATED);	
 	}
 
-	return PerformServerAction(CREATE);
+	string report = PerformServerAction(CREATE);
+
+	// we only come here on success
+	config["sync_host"] = hostname;
+
+	changed = true;
+
+	return report;
 }
 
 string SyncableStorage::SyncDeleteFromServer()
@@ -654,6 +655,8 @@ string SyncableStorage::Sync()
 	if(!SyncIsAssociated()) {
 		throw Storage::Exception(Storage::Exception::SYNC_NOT_ASSOCIATED);	
 	}
+
+	changed = true; // not sure we need this
 
 	return PerformServerAction(UPDATE);
 }
