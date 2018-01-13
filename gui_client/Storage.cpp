@@ -136,58 +136,19 @@ void Storage::InitCryptoStuff() {
 	
 }
 
-/*
-	def __init__(self, filename, passphrase=None, create=False):
-		self.filename=filename
-		self.passphrase=passphrase
-		self.raw=False if self.passphrase else True
-		
-		flags=os.O_RDWR
-		if create:
-			flags|=os.O_EXCL|os.O_CREAT
-		fd=os.open(filename, flags, 0600)
-		try:
-			fcntl.lockf(fd, fcntl.LOCK_EX|fcntl.LOCK_NB)
-		except IOError, e:
-			if e.errno in (errno.EACCES, errno.EAGAIN):
-				raise BackendError(BackendError.MULTIPLE_INSTANCES_RUNNING)
-			else:
-				raise
-		self.f=os.fdopen(fd, "r+")
-		
-		if create:
-			self.changed=True
-			self.data={}
-			self.config={}
-			self.save()
-		else:
-			if self.raw:
-				json_in=json.load(f)
-				
-			else:
-				ciphertext=self.f.read()
-				cleartext=scrypt.decrypt(ciphertext, passphrase)
-				json_in=json.loads(cleartext)
-			self.f.seek(0)
-			
-			# Backwards compatibility to the old passmate format
-			if isinstance(json_in, dict):
-				self.data=json_in
-				self.config={}
-			else:
-				self.data, self.config=json_in	
-			self.changed=False
-*/
-
 
 // This is a real cheating function, but as long as it works well, it will probably stay here.
-map<string, Record> Storage::GetAllRecords()
+map<string, Record> Storage::GetAllRecords(json *data_src)
 {
 	map<string, Record> all_records;
 
 	json::iterator record_it, field_it, vect_it;
 
-	for(record_it = data.begin(); record_it != data.end(); record_it++) {
+	if(!data_src) {
+		data_src = &data;
+	}
+
+	for(record_it = (*data_src).begin(); record_it != (*data_src).end(); record_it++) {
 		string record_id = record_it.key();
 		json field_array = record_it.value();
 
@@ -213,7 +174,7 @@ map<string, Record> Storage::GetAllRecords()
 			continue;
 
 		if(all_records.count(new_record.GetPath())) {
-			throw runtime_error("Storage loaded with invalid JSON: Duplicate PATH detected.");
+			throw Storage::Exception(Storage::Exception::MERGE_ERROR_DUPLICATE_PATH, "Storage loaded with invalid JSON: Duplicate PATH detected.");
 		} else {	
 			all_records[new_record.GetPath()] = new_record;
 		}
@@ -279,7 +240,6 @@ void Storage::Save()
 			stringstream backupFilename_stream;
 			backupFilename_stream << filename << ".bak" << setw(5) << setfill('0') << counter;
 	     	backupFilename = backupFilename_stream.str();
-	     	cout << backupFilename << endl;
 	     	if(stat(backupFilename.c_str(),&myStat)) {
 	     		counterEndReached=true;
 	     	} else {
@@ -359,22 +319,37 @@ void Storage::AddSpacePadding(string &s)
 }
 
 
-/*	
-	def path_of_record(self, record):
-		path=None
-		for kv in record:
-			key=kv[key_field]
-			values=kv[2:]
-			if key=="PATH":
-				if len(values)==1:
-					path=values[0]
-				else:
-					path=None
-		return path
-*/
-
-int Storage::MergeRecords_InsertSort(json &dest_array, const json &item)
+void Storage::MergeRecords_InsertSort(json &dest_array, const json &item)
 {
+	string item_name = item[0];
+	long long item_timestamp = item[1];
+
+	bool inserted=false;
+	auto dest_it=dest_array.begin();
+	do {
+		if(dest_it == dest_array.end()) {
+			dest_array.insert(dest_it, item);
+			inserted = true;
+		} else {
+			string cur_name = dest_it.value()[0];
+			long long cur_timestamp = dest_it.value()[1];
+
+			if((cur_timestamp == item_timestamp) && (cur_name == item_name)) {
+				if(item == dest_it.value()) {
+					// if the values are equal, it's all good
+					return;
+				} else {
+					throw Storage::Exception(Storage::Exception::MERGE_ERROR_DUPLICATE_TIME);
+				}
+			}
+			if(cur_timestamp > item_timestamp) {
+				dest_array.insert(dest_it, item);
+				inserted = true;
+			}
+
+			dest_it++; 
+		}
+	} while(!inserted);
 
 }
 
@@ -392,21 +367,6 @@ json Storage::MergeRecords(const json &local, const json &remote, const string &
 
 	return out;
 }
-/*
-	def merge_records(self, local, remote, rid):
-		local_s=set(map(tuple, local))
-		remote_s=set(map(tuple, remote))
-		new_s= remote_s | local_s
-		new=sorted(map(list, list(new_s)), key=lambda x: x[time_field])
-		
-		if contains_duplicates(map(lambda kv: (kv[key_field], kv[time_field]), new)):
-			raise BackendError(BackendError.MERGE_ERROR_DUPLICATE_TIME)
-			
-		pushed=map(lambda kv: kv[key_field], local_s-remote_s)
-		pulled=map(lambda kv: kv[key_field], remote_s-local_s)
-		
-		return new, MergeReportItem(rid=rid, push=pushed, pull=pulled, path=self.path_of_record(new))
-*/
 
 string Storage::Merge(json merge_input)
 {
@@ -420,10 +380,17 @@ string Storage::Merge(json merge_input)
 		string record_id = record_it.key();
 		json field_array = record_it.value();
 
-		// BIG TODO HERE
-		//		if RID not in remote, just keep local record
-		//		else, merge with remote record and add to result and remove remote record from merge_input
-		//		check for path conflict
+		json append_me;
+
+		if(merge_input.count(record_id)<1) {
+			append_me = field_array;
+		}
+		else {
+			append_me = MergeRecords(field_array, merge_input[record_id], record_id, report);
+			merge_input.erase(record_id);
+		}
+
+		AppendWithPathConflictCheck(new_data, record_id, append_me);
 	}
 
 
@@ -432,49 +399,41 @@ string Storage::Merge(json merge_input)
 		string record_id = record_it.key();
 		json field_array = record_it.value();
 
-		// BIG TODO HERE
-		// 		check for path conflict
-
+		AppendWithPathConflictCheck(new_data, record_id, field_array);
 	}
 
-	//data = new_data;
-
-	report << "Nothing done here yet...";
+	// If no exception happens until we are here, commit new data object.
+	data = new_data;
 
 	return report.str();
 }
 
-/*	
-	def merge(self, merge_input):
-		merge_report=[]
-		new_data={}
-		local_k=set(self.data.keys())
-		remote_k=set(merge_input.keys())
-		for rid in local_k|remote_k:
-			if not (rid in local_k):
-				local_rec=[]
-			else:
-				local_rec=self.data[rid]
-				
-			if not (rid in remote_k):
-				remote_rec=[]
-			else:
-				remote_rec=merge_input[rid]
-				
-			assert len(local_rec)>0 or len(remote_rec)>0
-			
-			new_record, mri=self.merge_records(local_rec, remote_rec, rid)
-			if mri.contains_change():
-				merge_report.append(mri)
-			if self.path_of_record(new_record) and self.path_of_record(new_record) in map(self.path_of_record, new_data.values()):
-				raise BackendError(BackendError.MERGE_ERROR_DUPLICATE_PATH)
-				
-			new_data[rid]=new_record
-			
-		self.data=new_data
-		return merge_report
-*/
+void Storage::AppendWithPathConflictCheck(json &new_data, const string &record_id, json &field_array)
+{
+	Record new_record;
+	for(auto field_it=field_array.begin(); field_it != field_array.end(); field_it++) {
+		json vect = field_it.value();
 
+		string vect_name = vect[0];
+		long long vect_timestamp = vect[1];
+
+		vector<string> vect_value;
+
+		for(auto vect_it=vect.begin() + 2;vect_it != vect.end(); vect_it++) {
+			vect_value.push_back(vect_it.value());
+		}
+
+		new_record.UpdateByVect(vect_name, vect_timestamp, vect_value);
+	}
+
+	string path = new_record.GetPath();
+
+	if(GetAllRecords(&new_data).count(path)>0) {
+		throw Storage::Exception(Storage::Exception::MERGE_ERROR_DUPLICATE_PATH);
+	}
+
+	new_data[record_id] = field_array;
+}
 
 string Storage::PutSyncData(string sync_data)
 {
@@ -482,13 +441,6 @@ string Storage::PutSyncData(string sync_data)
 	
 	return Merge(json_in);
 }
-
-/*
-	def decrypt_and_merge_data_without_config(self, ciphertext):
-		cleartext=scrypt.decrypt(ciphertext, self.passphrase)
-		json_in=json.loads(cleartext)
-		return self.merge(json_in)
-*/
 
 /**************************************************************************
  * Here comes the real core stuff

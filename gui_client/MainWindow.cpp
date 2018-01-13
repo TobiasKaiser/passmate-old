@@ -826,7 +826,9 @@ void MainWindow::OnSync(wxCommandEvent &evt)
     }
 
     UpdateMenuEntries();
-    
+ 
+	UpdateRecordTree();
+	UpdateRecordPanel();   
 }
 
 void MainWindow::OnSyncSetupNewAccount(wxCommandEvent &evt)
@@ -896,6 +898,9 @@ void MainWindow::OnSyncSetup(wxCommandEvent &evt)
     }
 
     UpdateMenuEntries();
+
+    UpdateRecordTree();
+	UpdateRecordPanel();
 }
 
 void MainWindow::OnSyncDeleteFromServer(wxCommandEvent &evt)

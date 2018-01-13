@@ -104,8 +104,9 @@ class Storage {
 		void AddSpacePadding(std::string &s);
 
 		void RecordSetRaw(std::string const &path, std::string const &key, std::vector<std::string> const &values);
+
 		std::string GenerateNewRID();
-		std::map<std::string, Record> GetAllRecords();
+		std::map<std::string, Record> GetAllRecords(nlohmann::json *data_src = NULL);
 
 		nlohmann::json data;
 		nlohmann::json config; 
@@ -128,6 +129,6 @@ class Storage {
     	
     	std::string Merge(nlohmann::json merge_input);
 		nlohmann::json MergeRecords(const nlohmann::json &local, const nlohmann::json &remote, const std::string &rid, std::ostringstream &report);
-		int MergeRecords_InsertSort(nlohmann::json &dest_array, const nlohmann::json &item);
-
+		void MergeRecords_InsertSort(nlohmann::json &dest_array, const nlohmann::json &item);
+		void AppendWithPathConflictCheck(nlohmann::json &new_data, const std::string &record_id, nlohmann::json &field_array);
 };

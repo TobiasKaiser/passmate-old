@@ -168,14 +168,7 @@ string SyncableStorage::GetBToken(string key)
 	mbedtls_ctr_drbg_random(&my_prng_ctx, iv, 16);
 
 
-	for(int i=0;i<16;i++) {
-		printf("%x ", iv[i]);
-	}
-	printf("\n");
-
 	string cleartext = GetSyncData();
-
-	cout << "SENDING: " << cleartext << endl;
 
 	vector<char> outbuf(cleartext.length() + 16 + 32);
 
@@ -237,11 +230,6 @@ string SyncableStorage::PutBToken(string btoken, string key)
 	unsigned char iv[16]; // we cannot use a const thing here
 
 	memcpy(iv, btoken.c_str(), 16);
-
-	for(int i=0;i<16;i++) {
-		printf("%x ", iv[i]);
-	}
-	printf("\n");
 
 	mbedtls_aes_init(&aes);
 	mbedtls_aes_setkey_dec( &aes, (const unsigned char *) aes_data_key.c_str(), 256 );
