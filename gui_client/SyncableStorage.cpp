@@ -543,7 +543,7 @@ string SyncableStorage::PerformServerAction(enum SyncableStorage::ServerAction a
 
     server_protocol_version = ntohs(server_protocol_version_n);
 
-    if(server_protocol_version != 1) {
+    if(server_protocol_version != 2) {
     	throw Exception(Exception::SYNC_SERVER_PROTOCOL_VERSION_MISMATCH);
     }
 

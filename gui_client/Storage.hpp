@@ -101,6 +101,8 @@ class Storage {
 		bool IsValid() { return valid; }
 
 	protected:
+		void AddSpacePadding(std::string &s);
+
 		void RecordSetRaw(std::string const &path, std::string const &key, std::vector<std::string> const &values);
 		std::string GenerateNewRID();
 		std::map<std::string, Record> GetAllRecords();

@@ -304,6 +304,8 @@ void Storage::Save()
 		// Save encrypted
 		string json_str = json({ data, config }).dump();
 
+		AddSpacePadding(json_str);
+
 		vector<char> outbuf(json_str.length()+128);
 
 		ScryptEncCtx enc(&my_prng_ctx);
@@ -332,6 +334,8 @@ std::string Storage::EncryptDataWithoutConfig()
 	// Untested so far
 	string json_str = data.dump();
 
+	AddSpacePadding(json_str);
+
 	vector<char> outbuf(json_str.length()+128);
 
 	ScryptEncCtx enc(&my_prng_ctx);
@@ -344,14 +348,24 @@ std::string Storage::EncryptDataWithoutConfig()
 	return ret;
 }
 
-/*
-	def encrypt_data_without_config(self):
-		cleartext=json.dumps(self.data)
-		cleartext=spacepad4k(cleartext)
-		ciphertext=scrypt.encrypt(cleartext, self.passphrase,
-			maxtime=2.5, maxmem=0, maxmemfrac=0.5)
-		return ciphertext
-*/
+void Storage::AddSpacePadding(string &s)
+{
+	const int blocksize = 4096;
+
+	int length = s.length();
+
+	int blocks = ((length-1)/blocksize)+1;
+
+	if(blocks < 1) {
+		blocks = 1;
+	}
+
+	int missing_spaces = blocks * blocksize - length;
+
+	string padding(missing_spaces, ' ');
+
+	s += padding;
+}
 
 
 /*	
