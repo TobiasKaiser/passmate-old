@@ -1,7 +1,7 @@
 Passmate b-token
 ----------------
 
-The JSON storage data, but only the first part of the array, not the second one which is the config part, is encrypted in the scrypt format, and then encrypted again using AES-CBC using a key derived from the sync key. Together with a HMAC message digest and the random IV, this data is called b-token and is transferred to the server and stored there. 
+<strike>The JSON storage data, but only the first part of the array, not the second one which is the config part, is encrypted in the scrypt format, and then encrypted again</strike> The JSON storage data, but only the first part of the array, not the second one which is the config part, is space-padded and encrypted using AES-CBC using a key derived from the sync key. Together with a HMAC message digest and the random IV, this data is called b-token and is transferred to the server and stored there. 
 
 See key_format.md how the SHA256-HMAC and AES256-CBC keys are derived from the sync key.
 

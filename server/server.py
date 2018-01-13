@@ -140,7 +140,7 @@ class Connection(threading.Thread):
 			self.sock.close()
 
 class SyncServer:
-	server_protocol_version=1
+	server_protocol_version=2 # 2 = no double encryption anymore. requires no server changes, but clients should not confuse version 1 btokens with version 2 btokens.
 	max_btoken_length=2*1024*1024
 
 	def __init__(self, ca_file, key_file, storage_dir, banner_file):
