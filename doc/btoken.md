@@ -10,7 +10,7 @@ b-token format:
 | offset | length (bytes) | content |
 | ------ | -------------- | ------- |
 | 0		 | 16             | IV for AES256-CBC |
-| 16     | 32			  | SHA256-HMAC of ciphertext |
-| 48     | X (inferred from btoken length) | ciphertext in AES256-CBC |
+| 16     | X (inferred from btoken length) | ciphertext in AES256-CBC |
+| 16+X   | 32			  | SHA256-HMAC of IV and ciphertext |
 
 The b-tokens are stored by the server prepended by a 32 byte auth key, which is also derived from the sync key.

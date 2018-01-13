@@ -329,23 +329,14 @@ void Storage::Save()
 
 }
 
-std::string Storage::EncryptDataWithoutConfig()
+std::string Storage::GetSyncData()
 {
 	// Untested so far
 	string json_str = data.dump();
 
 	AddSpacePadding(json_str);
 
-	vector<char> outbuf(json_str.length()+128);
-
-	ScryptEncCtx enc(&my_prng_ctx);
-
-	// This will throw a Storage:Exception in case something goes wrong		
-	enc.encrypt((const uint8_t *) json_str.c_str(), json_str.length(), (uint8_t *) &outbuf[0], (const uint8_t *) passphrase.c_str(), passphrase.length(), 16*1024*1024, 0.5, 3.0);
-
-	std::string ret(outbuf.begin(), outbuf.end());
-
-	return ret;
+	return json_str;
 }
 
 void Storage::AddSpacePadding(string &s)
@@ -446,7 +437,9 @@ string Storage::Merge(json merge_input)
 
 	}
 
-	data = new_data;
+	//data = new_data;
+
+	report << "Nothing done here yet...";
 
 	return report.str();
 }
@@ -483,26 +476,10 @@ string Storage::Merge(json merge_input)
 */
 
 
-string Storage::DecryptAndMergeDataWithoutConfig(string ciphertext)
+string Storage::PutSyncData(string sync_data)
 {
-	// 1. decrypt ciphertext with scrypt
-	ScryptDecCtx dec(true);
-
-	if(ciphertext.length()-128 < 0) {
-		throw Exception(Exception::CRYPTO_ERROR);	
-	}
-
-	vector<char> outbuf(ciphertext.length()-128);
+	json json_in = json::parse(sync_data);
 	
-	// This throws an Storage::Exception in many cases.		
-	dec.decrypt((const uint8_t *) ciphertext.c_str(), ciphertext.length(), (uint8_t *) &outbuf[0], NULL, (const uint8_t *) passphrase.c_str(), passphrase.length(), 16*1024*1024, 0.5, 6);
-
-	string cleartext(outbuf.begin(),outbuf.end());
-
-	// 2. Convert to JSON
-	json json_in = json::parse(cleartext);
-	
-	// 3. Merge
 	return Merge(json_in);
 }
 

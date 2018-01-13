@@ -18,7 +18,6 @@
 
 using namespace std;
 
-
 // CRC-CCITT / http://stackoverflow.com/questions/10564491/function-to-calculate-a-crc16-checksum
 uint16_t SyncableStorage::crc16(const uint8_t *data, size_t len)
 {
@@ -161,44 +160,98 @@ void SyncableStorage::DeriveKeys(const string &enckey, string &aes_data_key, str
 
 string SyncableStorage::GetBToken(string key)
 {
-	return "test token";	
+	string aes_data_key, hmac_key, auth_token;
+	DeriveKeys(key, aes_data_key, hmac_key, auth_token);
+
+	unsigned char iv[16];
+
+	mbedtls_ctr_drbg_random(&my_prng_ctx, iv, 16);
+
+
+	for(int i=0;i<16;i++) {
+		printf("%x ", iv[i]);
+	}
+	printf("\n");
+
+	string cleartext = GetSyncData();
+
+	cout << "SENDING: " << cleartext << endl;
+
+	vector<char> outbuf(cleartext.length() + 16 + 32);
+
+	vector<char> test(cleartext.length());
+
+	memcpy(&outbuf[0], iv, 16);
+		
+	mbedtls_aes_context aes;
+
+	mbedtls_aes_init(&aes);
+	mbedtls_aes_setkey_enc( &aes, (const unsigned char *) aes_data_key.c_str(), 256 );
+	mbedtls_aes_crypt_cbc( &aes, MBEDTLS_AES_ENCRYPT, cleartext.length(), iv, (const unsigned char*) cleartext.c_str(), (unsigned char*) &outbuf[16]);
+	mbedtls_aes_free(&aes);
+
+	/* Add signature. */
+	mbedtls_md_context_t hctx;	
+	
+	mbedtls_md_init(&hctx);  
+	mbedtls_md_setup(&hctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 1);
+	mbedtls_md_hmac_starts(&hctx, (const unsigned char*) hmac_key.c_str(), 32);
+	mbedtls_md_hmac_update(&hctx, (const unsigned char*) &outbuf[0], cleartext.length() + 16);    
+	mbedtls_md_hmac_finish(&hctx, (unsigned char*) &outbuf[cleartext.length() + 16]);
+	mbedtls_md_free(&hctx);
+
+	string ret(outbuf.begin(), outbuf.end());
+
+	return ret;
 }
-/*	def get_btoken(self, key):
-		aes_data_key, hmac_key, _=self.all_keys(key)
-		iv = Random.new().read(AES.block_size)
-		
-		cleartext=self.encrypt_data_without_config()
-		
-		ciphertext = AES.new(aes_data_key, AES.MODE_CBC, iv).encrypt(cleartext)
-		hmac = HMAC.new(hmac_key, ciphertext, SHA256).digest()
-		
-		# IV is 16 bytes, hmac is 32 bytes, ciphertext is rest
-		return iv+hmac+ciphertext
-*/
 
 string SyncableStorage::PutBToken(string btoken, string key)
 {
-	cout << "Put btoken..." << endl;
+	if(btoken.length() < 16 + 32) {
+		throw Storage::Exception(Storage::Exception::CRYPTO_ERROR, "Invalid btoken length");
+	}
 
-	return "blub...";
+	string aes_data_key, hmac_key, auth_token;
+	DeriveKeys(key, aes_data_key, hmac_key, auth_token);
+
+	vector<char> cleartext(btoken.length() - 16 - 32);
+
+	// check btoken message integrity	
+	mbedtls_md_context_t hctx;
+	unsigned char hmac_ref[32];
+	
+	mbedtls_md_init(&hctx);  
+	mbedtls_md_setup(&hctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 1);
+	mbedtls_md_hmac_starts(&hctx, (const unsigned char*) hmac_key.c_str(), 32);
+	mbedtls_md_hmac_update(&hctx, (const unsigned char*) btoken.c_str(), cleartext.size() + 16);    
+	mbedtls_md_hmac_finish(&hctx, (unsigned char*) hmac_ref);
+	mbedtls_md_free(&hctx);
+
+	if(memcmp(hmac_ref, btoken.c_str() + cleartext.size() + 16, 32) != 0) {
+		throw Storage::Exception(Storage::Exception::CRYPTO_ERROR, "Received btoken HMAC verification failed.");
+	}
+
+	// decrypt ciphertext
+	mbedtls_aes_context aes;
+
+	unsigned char iv[16]; // we cannot use a const thing here
+
+	memcpy(iv, btoken.c_str(), 16);
+
+	for(int i=0;i<16;i++) {
+		printf("%x ", iv[i]);
+	}
+	printf("\n");
+
+	mbedtls_aes_init(&aes);
+	mbedtls_aes_setkey_dec( &aes, (const unsigned char *) aes_data_key.c_str(), 256 );
+	mbedtls_aes_crypt_cbc( &aes, MBEDTLS_AES_DECRYPT, cleartext.size(), iv, (const unsigned char*) btoken.c_str() + 16, (unsigned char*) &cleartext[0]);
+	mbedtls_aes_free(&aes);
+
+	string json_in(cleartext.begin(), cleartext.end());
+
+	return PutSyncData(json_in);
 }
-
-
-/*	def put_btoken(self, btoken, key):
-		if len(btoken)<(4096+128+32+16): # 16 byte IV, 32 byte HMAC, 128 byte scrypt header, data in multiple of 4096
-			raise SyncError(SyncError.ILLEGAL_BTOKEN)
-		
-		aes_data_key, hmac_key, _=self.all_keys(key)
-		
-		iv, hmac_received, ciphertext=btoken[0:16], btoken[16:48], btoken[48:]
-		
-		hmac_calculated = HMAC.new(hmac_key, ciphertext, SHA256).digest()
-		if hmac_received!=hmac_calculated:
-			raise SyncError(SyncError.ILLEGAL_BTOKEN)
-		
-		cleartext=AES.new(aes_data_key, AES.MODE_CBC, iv).decrypt(ciphertext)
-		return self.decrypt_and_merge_data_without_config(cleartext)
-*/	
 
 bool SyncableStorage::SyncIsAssociated()
 {
@@ -259,25 +312,6 @@ int SyncableStorage::SSLWriteExactly(mbedtls_ssl_context *ssl, const unsigned ch
 	return ret;
 	// TODO: Make sure ret is always either negative or equal to len! (partial writes are possible with mbedtls_ssl_write)
 }
-
-	/*
-		
-			
-			account_no=struct.unpack("!8s",self.read_exactly(sock, 8))[0]
-			
-			if account_no=="\0\0\0\0\0\0\0\0":
-				raise SyncError(SyncError.SERVER_ERROR)
-		finally:
-			sock.close()
-			
-		self.config["sync_host"]=hostname
-		self.config["sync_key"]=pack_key(account_no, key)
-		self.config["own_ca_data"]=base64.b64encode(own_ca_data) if own_ca_data else None
-		self.changed=True
-		msg+="success!\n"
-		return msg
-	*/
-
 
 
 void SyncableStorage::CommunicateCreate(mbedtls_ssl_context *ssl, ostringstream &output)
