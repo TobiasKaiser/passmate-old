@@ -294,8 +294,6 @@ void MainWindow::UpdateRecordTree()
         select_me = NULL;
     }
 
-
-
     if(select_me && select_me->item_id) {
         recordTree->SelectItem(select_me->item_id);
         irt_root.ExpandTreeTo(recordTree, select_me);
@@ -570,6 +568,10 @@ void MainWindow::OnButtonAddRecord(wxCommandEvent &evt)
         string path(recordNameDialog.GetValue());
 
         try {
+			// This needs to be done before creating a new value
+			// to prevent the software from crashing when it tries to select an entry from the record tree which is not shown due to filtering.
+    		entryFilter->SetValue("");
+
             st.NewRecord(path);
             st.Save();
             SwitchToRecord(path);
