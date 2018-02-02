@@ -6,6 +6,10 @@
 #include <string>
 #include <errno.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "ScryptEnc.hpp"
 
@@ -28,8 +32,53 @@ bool Storage::FileExists() {
 }
 
 
+void Storage::AcquireLock()
+{
+	string lock_filename = filename + ".lock";
+
+	lockfile_fd = open(lock_filename.c_str(), O_RDWR|O_CREAT, 0666);
+
+	if(lockfile_fd < 0) {
+		throw Storage::Exception(Exception::ERROR_SAVING_FILE, "Error opening lock file");
+	}
+
+	struct flock fl;
+	memset(&fl, 0, sizeof(fl));
+
+	fl.l_type = F_WRLCK;
+
+	// lock entire file
+	fl.l_whence = SEEK_SET;
+	fl.l_start = 0;         
+	fl.l_len = 0;   
+
+	// non-blocking
+	if (fcntl(lockfile_fd, F_SETLK, &fl) == -1) {
+	    throw Storage::Exception(Storage::Exception::MULTIPLE_INSTANCES_RUNNING);
+	}
+}
+
+void Storage::ReleaseLock()
+{
+	string lock_filename = filename + ".lock";
+
+	// Do not close before unlink, else someone else might acquire a lock on a file that is deleted immediately afterwards.
+
+	unlink(lock_filename.c_str());
+
+	close(lockfile_fd);
+
+}
+
+Storage::~Storage()
+{
+	ReleaseLock();
+}
+
 void Storage::Open(bool create, const string &passphrase) {
 	json j;
+
+	AcquireLock();
 
 	ifstream f(filename);
 	

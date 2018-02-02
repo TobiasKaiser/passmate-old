@@ -16,14 +16,23 @@ using namespace std;
 wxIMPLEMENT_APP(Application);
 //wxIMPLEMENT_APP_CONSOLE(Application);
 
-Application::Application() {
+Application::Application()
+{
     storage=NULL;
 
 
     storage_filename = "";
 }
 
-bool Application::OnInit() {
+Application::~Application()
+{
+	if(storage) {
+		delete storage;
+	}
+}
+
+bool Application::OnInit()
+{
     //if(!wxApp::OnInit()) {
     //    return false;
     //}

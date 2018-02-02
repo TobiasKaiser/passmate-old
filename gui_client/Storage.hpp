@@ -27,6 +27,7 @@ class Storage {
 
 		// Constructor and file-level functions
 		Storage(std::string filename);
+		~Storage();
 
 		bool FileExists(); 
 		
@@ -101,6 +102,11 @@ class Storage {
 		bool IsValid() { return valid; }
 
 	protected:
+		int lockfile_fd;
+
+		void AcquireLock();
+		void ReleaseLock();
+
 		void AddSpacePadding(std::string &s);
 
 		void RecordSetRaw(std::string const &path, std::string const &key, std::vector<std::string> const &values);

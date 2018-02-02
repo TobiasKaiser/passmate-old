@@ -9,6 +9,7 @@ class SyncableStorage;
 class Application : public wxApp {
     public:
         Application();
+		~Application();
 
         virtual bool OnInit();
         virtual int OnExit();
