@@ -14,7 +14,7 @@
 
 using namespace std;
 
-const static char *defaultHostname = "passmate.net";
+const static char *defaultHostname = "sync.passmate.net";
 
 MainWindow::MainWindow()
     : wxFrame(NULL, wxID_ANY, wxT("Passmate"), wxDefaultPosition, wxSize(0, 0))

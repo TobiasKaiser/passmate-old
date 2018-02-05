@@ -286,22 +286,27 @@ int SyncableStorage::SSLWriteExactly(mbedtls_ssl_context *ssl, const unsigned ch
 {
 	int ret;
 
-	while( ( ret = mbedtls_ssl_write( ssl, buf, len ) ) <= 0 ) {
-	    if( ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_WANT_WRITE ) {
-	    	// in these cases we should try again. there might be some non-blocking weridness going on.
-	    }
-	    else {
-	    	char error_buf[100];
-	        mbedtls_strerror( ret, error_buf, 100 );
-	        std::ostringstream error_msg;
-	        error_msg << "mbedtls_ssl_write failed with return code " << ret << ": " << error_buf;
-	    	throw Exception(Exception::SYNC_GENERIC_ERROR, error_msg.str());
-        
-	        break;
-	    }
+	int bytes_left = len;
+
+	while(bytes_left) {
+		while( ( ret = mbedtls_ssl_write( ssl, buf, bytes_left ) ) <= 0 ) {
+		    if( ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_WANT_WRITE ) {
+		    	// in these cases we should try again. there might be some non-blocking weridness going on.
+		    }
+		    else {
+		    	char error_buf[100];
+		        mbedtls_strerror( ret, error_buf, 100 );
+		        std::ostringstream error_msg;
+		        error_msg << "mbedtls_ssl_write failed with return code " << ret << ": " << error_buf;
+		    	throw Exception(Exception::SYNC_GENERIC_ERROR, error_msg.str());
+	        
+		        break;
+		    }
+		}
+		bytes_left -= ret;
+		buf += ret;
 	}
 	return ret;
-	// TODO: Make sure ret is always either negative or equal to len! (partial writes are possible with mbedtls_ssl_write)
 }
 
 
@@ -325,8 +330,6 @@ void SyncableStorage::CommunicateCreate(mbedtls_ssl_context *ssl, ostringstream 
 
 	// Send auth token to server. We will then receive an account no from server.
 	SSLWriteExactly(ssl, (unsigned char*) auth_token.c_str(), auth_token.length());
-
-	cout << btoken_send.length() << endl;
 
     // Send btoken
 	string btoken_send = GetBToken(enckey);
@@ -448,8 +451,6 @@ void SyncableStorage::LoadSystemCerts(mbedtls_x509_crt &cacert)
 	for(auto &cert_filename : cert_filenames) {
 		struct stat buffer;   
   		if (stat (cert_filename.c_str(), &buffer) == 0) {
-
-  			cout << cert_filename << endl;
 
 			// Load CA certificate
 			ret = mbedtls_x509_crt_parse_file( &cacert, cert_filename.c_str());
