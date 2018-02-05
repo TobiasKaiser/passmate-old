@@ -5,6 +5,8 @@
 
 #include <arpa/inet.h>
 
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "mbedtls/net_sockets.h"
 #include "mbedtls/debug.h"
@@ -15,6 +17,7 @@
 #include "mbedtls/certs.h"
 
 #include "SyncableStorage.hpp"
+
 
 using namespace std;
 
@@ -323,6 +326,8 @@ void SyncableStorage::CommunicateCreate(mbedtls_ssl_context *ssl, ostringstream 
 	// Send auth token to server. We will then receive an account no from server.
 	SSLWriteExactly(ssl, (unsigned char*) auth_token.c_str(), auth_token.length());
 
+	cout << btoken_send.length() << endl;
+
     // Send btoken
 	string btoken_send = GetBToken(enckey);
 	uint32_t len_btoken_send = htonl(btoken_send.length());
@@ -424,16 +429,53 @@ void SyncableStorage::CommunicateReset(mbedtls_ssl_context *ssl, ostringstream &
 	}
 }
 
-string SyncableStorage::PerformServerAction(enum SyncableStorage::ServerAction action)
+
+void SyncableStorage::LoadSystemCerts(mbedtls_x509_crt &cacert)
+{
+
+    //const char *server_cert = "/home/tobias/workspace/passmate/server/cert.pem";
+	int ret;
+
+	// See https://golang.org/src/crypto/x509/root_linux.go
+	vector<string> cert_filenames = {
+		"/etc/ssl/certs/ca-certificates.crt",                // Debian/Ubuntu/Gentoo etc.
+		"/etc/pki/tls/certs/ca-bundle.crt",                  // Fedora/RHEL 6
+		"/etc/ssl/ca-bundle.pem",                            // OpenSUSE
+		"/etc/pki/tls/cacert.pem",                           // OpenELEC
+		"/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem", // CentOS/RHEL 7
+	};
+
+	for(auto &cert_filename : cert_filenames) {
+		struct stat buffer;   
+  		if (stat (cert_filename.c_str(), &buffer) == 0) {
+
+  			cout << cert_filename << endl;
+
+			// Load CA certificate
+			ret = mbedtls_x509_crt_parse_file( &cacert, cert_filename.c_str());
+			if( ret < 0 ) {
+			    char error_buf[100];
+			    mbedtls_strerror( ret, error_buf, 100 );
+			    std::ostringstream error_msg;
+			    error_msg << "mbedtls_x509_crt_parse_file failed with return code " << ret << ": " << error_buf;
+				throw Exception(Exception::SYNC_GENERIC_ERROR, error_msg.str());
+			}
+
+  			return;
+  		} 
+	}
+
+	throw Exception(Exception::SYNC_GENERIC_ERROR, "No certificate storage found.");
+	
+}
+
+string SyncableStorage::PerformServerAction(std::string server_name, enum SyncableStorage::ServerAction action)
 {
 	ostringstream output;
 
 	//const char *server_name = "passmate.net";
-	const char *server_name = "localhost";
+	//const char *server_name = "localhost";
 	const char *server_port = "29556";
-    const char *server_cert = "/home/tobias/workspace/passmate/server/cert.pem";
-
-
 	int ret;
 
     mbedtls_net_context server_fd;
@@ -471,18 +513,10 @@ string SyncableStorage::PerformServerAction(enum SyncableStorage::ServerAction a
     std::unique_ptr<mbedtls_x509_crt, void(*)(mbedtls_x509_crt*)> cacert_ptr(&cacert, &mbedtls_x509_crt_free);
 
 
-   	// Load CA certificate
-    ret = mbedtls_x509_crt_parse_file( &cacert, server_cert);
-    if( ret < 0 ) {
-        char error_buf[100];
-        mbedtls_strerror( ret, error_buf, 100 );
-        std::ostringstream error_msg;
-        error_msg << "mbedtls_x509_crt_parse_file failed with return code " << ret << ": " << error_buf;
-    	throw Exception(Exception::SYNC_GENERIC_ERROR, error_msg.str());
-    }
+   	LoadSystemCerts( cacert );
 
     // Connect
-    if( ( ret = mbedtls_net_connect( &server_fd, server_name, server_port, MBEDTLS_NET_PROTO_TCP ) ) != 0 ) {
+    if( ( ret = mbedtls_net_connect( &server_fd, server_name.c_str(), server_port, MBEDTLS_NET_PROTO_TCP ) ) != 0 ) {
         char error_buf[100];
         mbedtls_strerror( ret, error_buf, 100 );
         std::ostringstream error_msg;
@@ -512,7 +546,7 @@ string SyncableStorage::PerformServerAction(enum SyncableStorage::ServerAction a
     	throw Exception(Exception::SYNC_GENERIC_ERROR, error_msg.str());
     }
 
-    if( ( ret = mbedtls_ssl_set_hostname( &ssl, server_name ) ) != 0 )
+    if( ( ret = mbedtls_ssl_set_hostname( &ssl, server_name.c_str() ) ) != 0 )
     {
         char error_buf[100];
         mbedtls_strerror( ret, error_buf, 100 );
@@ -626,7 +660,7 @@ string SyncableStorage::SyncSetupNewAccount(string hostname)
 		throw Storage::Exception(Storage::Exception::SYNC_ALREADY_ASSOCIATED);	
 	}
 
-	string report = PerformServerAction(CREATE);
+	string report = PerformServerAction(hostname, CREATE);
 
 	// we only come here on success
 	config["sync_host"] = hostname;
@@ -642,7 +676,7 @@ string SyncableStorage::SyncDeleteFromServer()
 		throw Storage::Exception(Storage::Exception::SYNC_NOT_ASSOCIATED);	
 	}
 
-	return PerformServerAction(RESET);
+	return PerformServerAction(config["sync_host"], RESET);
 }
 
 string SyncableStorage::SyncReset(bool delete_from_server)
@@ -680,7 +714,7 @@ string SyncableStorage::Sync()
 
 	changed = true; // not sure we need this
 
-	return PerformServerAction(UPDATE);
+	return PerformServerAction(config["sync_host"], UPDATE);
 }
 
 

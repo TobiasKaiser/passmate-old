@@ -49,7 +49,7 @@ class SyncableStorage : public Storage {
 			CREATE, UPDATE, RESET
 		};
 
-		std::string PerformServerAction(enum SyncableStorage::ServerAction action);
+		std::string PerformServerAction(std::string server_name, enum SyncableStorage::ServerAction action);
 
 		std::string SyncDeleteFromServer();
 
@@ -61,4 +61,6 @@ class SyncableStorage : public Storage {
 		void CommunicateCreate(mbedtls_ssl_context *ssl, std::ostringstream &output);
 		void CommunicateUpdate(mbedtls_ssl_context *ssl, std::ostringstream &output);
 		void CommunicateReset(mbedtls_ssl_context *ssl, std::ostringstream &output);
+
+		void LoadSystemCerts(mbedtls_x509_crt &cacert);
 };
