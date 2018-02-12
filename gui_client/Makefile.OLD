@@ -1,12 +1,14 @@
 CXX=$(shell wx-config --cxx)
 CXXFLAGS+=-Wall -I/usr/local/include -Iinclude -Wfatal-errors
-CXXFLAGS+=$(shell wx-config  --cppflags core,base,gl) -DGLEW_BUILD=GLEW_STATIC
+CXXFLAGS+=-stdlib=libc++ -std=c++11 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.13.sdk -mmacosx-version-min=10.13
+
+CXXFLAGS+=$(shell wx-config  --cppflags core,base) 
 #CXXFLAGS+=-I/usr/include/machine # we need this for <endian.h>?!?!
 CXXFLAGS+=-g -O0 # debug me
-#CXXFLAGS+=-std=c++11 -stdlib=libc++
 
 LIBS+=$(shell wx-config --libs) -lscrypt -lmbedtls -lmbedcrypto -lmbedx509
 LDFLAGS=$(CXXFLAGS)
+LDFLAGS+=-stdlib=libc++
 TARGET=passmate
 SRC=$(wildcard *.cpp)
 #SRC=Record.cpp Storage.cpp MainWindow.cpp Application.cpp ScryptEnc.cpp

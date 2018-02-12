@@ -441,6 +441,7 @@ void SyncableStorage::LoadSystemCerts(mbedtls_x509_crt &cacert)
 
 	// See https://golang.org/src/crypto/x509/root_linux.go
 	vector<string> cert_filenames = {
+		"/Users/tobias/Workspace/passmate/cert.pem",
 		"/etc/ssl/certs/ca-certificates.crt",                // Debian/Ubuntu/Gentoo etc.
 		"/etc/pki/tls/certs/ca-bundle.crt",                  // Fedora/RHEL 6
 		"/etc/ssl/ca-bundle.pem",                            // OpenSUSE

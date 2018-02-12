@@ -34,7 +34,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <endian.h>
+//#include <endian.h>
 
 #include <mbedtls/sha256.h>
 #include <mbedtls/md.h>
@@ -370,9 +370,9 @@ void ScryptEncCtx::setup(const uint8_t * passwd, size_t passwdlen, size_t maxmem
 	memcpy(header, "scrypt", 6);
 	header[6] = 0;
 	header[7] = logN & 0xff;
-	uint32_t r_be = htobe32(r);
+	uint32_t r_be = htonl(r);
 	memcpy(&header[8], &r_be, sizeof(uint32_t)); 
-	uint32_t p_be = htobe32(p);
+	uint32_t p_be = htonl(p);
  	memcpy(&header[12], &p_be, sizeof(uint32_t));
 	memcpy(&header[16], salt, 32);
 
@@ -404,10 +404,10 @@ void ScryptDecCtx::setup(const uint8_t * passwd, size_t passwdlen, size_t maxmem
 	logN = header[7];
 	uint32_t r_be;
 	memcpy(&r_be, &header[8], sizeof(uint32_t));
-	r = be32toh(r_be);
+	r = ntohl(r_be);
 	uint32_t p_be;
 	memcpy(&p_be, &header[12], sizeof(uint32_t));
-	p = be32toh(p_be);
+	p = ntohl(p_be);
 	memcpy(salt, &header[16], 32);
 
 	/* Verify header checksum. */

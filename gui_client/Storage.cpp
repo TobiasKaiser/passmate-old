@@ -92,7 +92,13 @@ void Storage::Open(bool create, const string &passphrase) {
 		if(create) {
 			data = json::object();
 			config = json::object();
+            
 			valid = true;
+
+            this->passphrase = passphrase;
+
+            changed = true;
+
 			return;	
 		} else {
 			throw Exception(Exception::FILE_NOT_FOUND);

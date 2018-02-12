@@ -529,6 +529,7 @@ void MainWindow::OnChangePass(wxCommandEvent &evt) {
     } while (!passwordsMatching);
 
     try {
+        cout << string(passwordDialog1.GetValue()) << endl;
         st.SetPassphrase(string(passwordDialog1.GetValue()));
         st.Save();
     } catch(const Storage::Exception &stex) {
