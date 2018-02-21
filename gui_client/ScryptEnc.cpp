@@ -35,6 +35,7 @@
 #include <stdlib.h>
 #include <string.h>
 //#include <endian.h>
+#include <arpa/inet.h>
 
 #include <mbedtls/sha256.h>
 #include <mbedtls/md.h>
