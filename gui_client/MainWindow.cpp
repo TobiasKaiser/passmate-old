@@ -233,6 +233,25 @@ void MainWindow::SwitchToNoRecord(void)
 }
 
 
+std::string MainWindow::lowercaseStr(std::string input)
+{
+	/* This should work fine for converting all ASCII upper-case characters to ASCII lower-case characters. It should also not mess up UTF-8, because the stuff embedded in the escaped characters will not contain characters that can be interpreted as ASCII 0-127, or so I have heard. */
+
+	string returnMe(input.length(), '\0');
+
+	int i;
+	for(i=0;i<input.length();i++) {
+		if(input[i]>='A' && input[i]<='Z') {
+			returnMe[i] = input[i] - 'A' + 'a'; 
+		} else {
+			returnMe[i] = input[i];
+		}
+	}
+	
+	return returnMe;
+}
+
+
 void MainWindow::UpdateRecordTree()
 {
     bool selected_before;
@@ -271,6 +290,9 @@ void MainWindow::UpdateRecordTree()
     string searchString = string(entryFilter->GetValue());
 
     if(searchString.length()>0) {
+    	searchString = lowercaseStr(searchString);
+
+
         irt_root.ApplyFilter(searchString);    
     }
     
@@ -1093,7 +1115,9 @@ bool MainWindow::IRTNode::ApplyFilter(std::string search)
             filter_flag = true;
     }
 
-    if(!filter_flag && (full_path.find(search) != string::npos)) {
+    string lowercase_full_path = lowercaseStr(full_path);
+
+    if(!filter_flag && (lowercase_full_path.find(search) != string::npos)) {
         filter_flag = true;
     }
 

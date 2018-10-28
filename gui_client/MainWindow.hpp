@@ -14,6 +14,8 @@ class MainWindow : public wxFrame {
 
         MainWindow();
 
+        static std::string lowercaseStr(std::string input);
+
     protected:
 
         // Internally used methods
@@ -30,6 +32,7 @@ class MainWindow : public wxFrame {
         void addFieldToPanel(std::string key, std::vector<std::string> values);
         bool isPasswordField(std::string key);
         bool confirmPass();
+        
 
         // Event handler
         // -------------
@@ -61,6 +64,7 @@ class MainWindow : public wxFrame {
         void OnSyncDeleteFromServer(wxCommandEvent &evt);
         void OnSyncReset(wxCommandEvent &evt);
         void OnSyncShowKey(wxCommandEvent &evt);
+
 
         // Helper classes
         // --------------
