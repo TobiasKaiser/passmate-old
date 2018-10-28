@@ -653,7 +653,21 @@ string SyncableStorage::SyncSetup(string hostname, string key)
 
 	changed = true;
 
-	return "Setup ok, server not contacted yet.";
+	try {
+		return Sync();
+	} catch(const Storage::Exception &stex) {
+		if(config.count("sync_key")) {
+			config.erase("sync_key");	
+		}
+		if(config.count("sync_host")) {
+			config.erase("sync_host");	
+		}
+		if(config.count("own_ca_data")) {
+			config.erase("own_ca_data");
+		}
+	
+		throw stex;
+	}
 }
 
 string SyncableStorage::SyncSetupNewAccount(string hostname)
