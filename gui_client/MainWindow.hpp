@@ -29,7 +29,7 @@ class MainWindow : public wxFrame {
         void SwitchToRecord(std::string path);
         void SwitchToNoRecord();
         void ShowCommitBar(bool enable);
-        void addFieldToPanel(std::string key, std::vector<std::string> values);
+        void addFieldToPanel(std::string key, std::vector<std::string> values, bool was_just_created=false);
         bool isPasswordField(std::string key);
         bool confirmPass();
         

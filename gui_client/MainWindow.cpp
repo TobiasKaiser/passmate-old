@@ -392,12 +392,11 @@ bool MainWindow::isPasswordField(std::string key)
     return regex_match(key, passwordRegex);
 }
 
-void MainWindow::addFieldToPanel(std::string key, std::vector<std::string> values)
+void MainWindow::addFieldToPanel(std::string key, std::vector<std::string> values, bool was_just_created)
 {
     wxStaticText *label;
     wxTextCtrl *entry;
     wxButton *buttonGenerate, *buttonHide, *buttonCopy, *buttonRemove;
-
 
     if(values.size() < 1) {
         // TODO: Handle this case this should not be occuring.
@@ -427,7 +426,9 @@ void MainWindow::addFieldToPanel(std::string key, std::vector<std::string> value
     
         if(isPasswordField(key)) {    
             
-            entry->SetWindowStyleFlag(entry->GetWindowStyleFlag() | wxTE_PASSWORD);
+            if(!was_just_created) {
+            	entry->SetWindowStyleFlag(entry->GetWindowStyleFlag() | wxTE_PASSWORD);
+        	}
 
             buttonGenerate=new wxButton(panelRecord, wxID_ANY, _T(""));
             buttonGenerate->SetBitmap(wxArtProvider::GetBitmap("gtk-execute", wxART_MENU));
@@ -687,7 +688,7 @@ void MainWindow::OnButtonAddField(wxCommandEvent &evt)
                         emptyValues.push_back(std::string(""));
                     }
 
-                    addFieldToPanel(string(fieldNameDialog.GetValue()), emptyValues);
+                    addFieldToPanel(string(fieldNameDialog.GetValue()), emptyValues, true);
 
                     sizerRecord->ShowItems(true);
                     panelRecord->Layout();
