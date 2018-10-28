@@ -17,7 +17,7 @@
 #include "mbedtls/certs.h"
 
 #include "SyncableStorage.hpp"
-
+#include "MiniCA.hpp"
 
 using namespace std;
 
@@ -436,12 +436,10 @@ void SyncableStorage::CommunicateReset(mbedtls_ssl_context *ssl, ostringstream &
 void SyncableStorage::LoadSystemCerts(mbedtls_x509_crt &cacert)
 {
 
-    //const char *server_cert = "/home/tobias/workspace/passmate/server/cert.pem";
 	int ret;
 
 	// See https://golang.org/src/crypto/x509/root_linux.go
 	vector<string> cert_filenames = {
-		"/Users/tobias/Workspace/passmate/cert.pem",
 		"/etc/ssl/certs/ca-certificates.crt",                // Debian/Ubuntu/Gentoo etc.
 		"/etc/pki/tls/certs/ca-bundle.crt",                  // Fedora/RHEL 6
 		"/etc/ssl/ca-bundle.pem",                            // OpenSUSE
@@ -466,8 +464,19 @@ void SyncableStorage::LoadSystemCerts(mbedtls_x509_crt &cacert)
   			return;
   		} 
 	}
+	
+	// This is only reached when none of the system CA files could be found:
 
-	throw Exception(Exception::SYNC_GENERIC_ERROR, "No certificate storage found.");
+	ret = mbedtls_x509_crt_parse( &cacert, (unsigned char *)MiniCA_BuiltInCert, strlen(MiniCA_BuiltInCert)+1);
+	if( ret < 0 ) {
+	    char error_buf[100];
+	    mbedtls_strerror( ret, error_buf, 100 );
+	    std::ostringstream error_msg;
+	    error_msg << "mbedtls_x509_crt_parse failed with return code " << ret << ": " << error_buf;
+		throw Exception(Exception::SYNC_GENERIC_ERROR, error_msg.str());
+	}
+
+	//throw Exception(Exception::SYNC_GENERIC_ERROR, "No certificate storage found.");
 	
 }
 
