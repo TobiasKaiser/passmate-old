@@ -114,7 +114,7 @@ bool Application::OnInit()
     if(!storage->FileExists()) {
     	// Setup new password storage
 
-    	wxPasswordEntryDialog passwordDialog1(NULL, wxT("No password storage found yet. Enter passphrase to creat new storage:"));
+    	wxPasswordEntryDialog passwordDialog1(NULL, wxT("No password storage found yet. Enter passphrase to create new storage:"));
     	wxPasswordEntryDialog passwordDialog2(NULL, wxT("Repeat passphrase:"));
 		
 		bool passwordsMatching;
