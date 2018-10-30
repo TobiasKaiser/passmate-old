@@ -65,7 +65,7 @@ void SyncableStorage::unpack_key(const string &key, string &account_no, string &
 		}
 	}
 
-	data[43] = '\0';
+	data[42] = '\0';
 
 	uint16_t checksum = crc16(data, 32 + 8);
 
@@ -104,7 +104,7 @@ string SyncableStorage::pack_key(const string &account_no, const string &enckey)
 
 	memcpy(data + 40, &checksum_be, 2);
 
-	data[43] = '\0'; // not really necessary
+	data[42] = '\0'; // not really necessary
 
 	char data_out[14*6 + 13 + 1];
 
