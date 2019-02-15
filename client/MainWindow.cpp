@@ -1,6 +1,7 @@
 #include <sstream>
 #include <regex>
 #include <string>
+#include <time.h>
 
 #include "MainWindow.hpp"
 #include "Application.hpp"
@@ -11,6 +12,7 @@
 #include <wx/clipbrd.h>
 #include <wx/textctrl.h>
 #include <wx/artprov.h>
+#include <wx/progdlg.h>
 
 using namespace std;
 
@@ -144,6 +146,13 @@ MainWindow::MainWindow()
     Show();
 
     Connect( wxEVT_SIZE, wxSizeEventHandler( MainWindow::OnSize ) );
+
+/*
+    Connect( wxEVT_COMMAND_WorkerThread_COMPLETED, wxThreadEventHandler(MainWindow::))
+wxBEGIN_EVENT_TABLE(MyFrame, wxFrame)
+    EVT_COMMAND(wxID_ANY, , MyFrame::OnThreadCompletion)
+wxEND_EVENT_TABLE()
+    */
 
     //panelRecord->ShowScrollbars(wxSHOW_SB_ALWAYS, wxSHOW_SB_ALWAYS);
 }
@@ -592,6 +601,9 @@ void MainWindow::OnButtonAddRecord(wxCommandEvent &evt)
         string path(recordNameDialog.GetValue());
 
         try {
+             new wxProgressDialog("In progess", "Please wait...");
+
+            /*
 			// This needs to be done before creating a new value
 			// to prevent the software from crashing when it tries to select an entry from the record tree which is not shown due to filtering.
     		entryFilter->SetValue("");
@@ -601,6 +613,8 @@ void MainWindow::OnButtonAddRecord(wxCommandEvent &evt)
             SwitchToRecord(path);
             UpdateRecordTree();
             recordTree->SelectItem(irt_root.FindByPath(path)->item_id);
+            */
+             
         } catch(const Storage::Exception &stex) {
             wxMessageDialog errDialog(NULL, wxString("Error: "+ string(stex.what())), wxT("Error"), wxOK|wxCENTRE);
             errDialog.ShowModal();
