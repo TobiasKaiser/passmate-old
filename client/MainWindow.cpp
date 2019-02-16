@@ -26,7 +26,7 @@ MainWindow::MainWindow()
     wxSplitterWindow *splittermain = new wxSplitterWindow(this,wxID_ANY,wxDefaultPosition,wxDefaultSize,wxSP_3D);
     wxPanel *panelLeft=new wxPanel(splittermain,wxID_ANY,wxDefaultPosition,wxDefaultSize,wxTAB_TRAVERSAL|wxNO_BORDER);
     panelRight=new wxPanel(splittermain,wxID_ANY,wxDefaultPosition,wxDefaultSize,wxTAB_TRAVERSAL|wxNO_BORDER);
-    splittermain->SplitVertically(panelLeft, panelRight);
+    
     panelRecord=new wxScrolledWindow(panelRight,wxID_ANY,wxDefaultPosition,wxDefaultSize, wxVSCROLL|wxBORDER_SUNKEN);
 
 
@@ -145,6 +145,9 @@ MainWindow::MainWindow()
 
     Connect( wxEVT_SIZE, wxSizeEventHandler( MainWindow::OnSize ) );
 
+    splittermain->SplitVertically(panelLeft, panelRight);
+
+    //splittermain->UpdateSize(); <-- Turns out to not be necessary
 
     CentreOnScreen();
     //panelRecord->ShowScrollbars(wxSHOW_SB_ALWAYS, wxSHOW_SB_ALWAYS);
