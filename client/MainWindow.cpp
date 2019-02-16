@@ -1,11 +1,11 @@
 #include <sstream>
 #include <regex>
 #include <string>
-#include <time.h>
 
 #include "MainWindow.hpp"
 #include "Application.hpp"
 #include "SyncableStorage.hpp"
+#include "WorkerThread.hpp"
 
 #include <wx/splitter.h>
 #include <wx/sizer.h>
@@ -147,8 +147,13 @@ MainWindow::MainWindow()
 
     Connect( wxEVT_SIZE, wxSizeEventHandler( MainWindow::OnSize ) );
 
-/*
-    Connect( wxEVT_COMMAND_WorkerThread_COMPLETED, wxThreadEventHandler(MainWindow::))
+
+
+void OnWorkerThreadProgress(wxThreadEvent& event);
+
+    Connect(wxEVT_WorkerThreadProgress, wxThreadEventHandler(MainWindow::OnWorkerThreadProgress));
+    Connect(wxEVT_WorkerThreadCompleted, wxThreadEventHandler(MainWindow::OnWorkerThreadCompleted));
+    /*
 wxBEGIN_EVENT_TABLE(MyFrame, wxFrame)
     EVT_COMMAND(wxID_ANY, , MyFrame::OnThreadCompletion)
 wxEND_EVENT_TABLE()
@@ -528,6 +533,17 @@ bool MainWindow::confirmPass() {
 // Event handler methods
 // ---------------------
 
+void MainWindow::OnWorkerThreadProgress(wxThreadEvent& event) {
+    printf("Oh look at that! We got a thread progress event!\n");
+    WorkerThread::ProgressData progress = event.GetPayload<WorkerThread::ProgressData>();
+
+    progressDialog->Update(progress.progress, progress.message);
+}
+
+void MainWindow::OnWorkerThreadCompleted(wxThreadEvent& event) {
+    printf("Oh look at that! We got a thread completed event!\n");
+    delete progressDialog;
+}
 
 void MainWindow::OnChangePass(wxCommandEvent &evt) {
     SyncableStorage &st = wxGetApp().GetStorage();
@@ -601,7 +617,17 @@ void MainWindow::OnButtonAddRecord(wxCommandEvent &evt)
         string path(recordNameDialog.GetValue());
 
         try {
-             new wxProgressDialog("In progess", "Please wait...");
+            progressDialog = new wxProgressDialog("In progess", "Please wait...");
+
+            WorkerThread *t = new WorkerThread(this);
+            if ( t->Run() != wxTHREAD_NO_ERROR )
+            {
+                wxLogError("Can't create the thread!");
+                delete t;
+                t = NULL;
+            }
+            printf("Thread created!\n");
+
 
             /*
 			// This needs to be done before creating a new value
@@ -614,7 +640,7 @@ void MainWindow::OnButtonAddRecord(wxCommandEvent &evt)
             UpdateRecordTree();
             recordTree->SelectItem(irt_root.FindByPath(path)->item_id);
             */
-             
+
         } catch(const Storage::Exception &stex) {
             wxMessageDialog errDialog(NULL, wxString("Error: "+ string(stex.what())), wxT("Error"), wxOK|wxCENTRE);
             errDialog.ShowModal();

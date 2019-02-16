@@ -9,12 +9,16 @@
 
 #include "Record.hpp"
 
+class wxProgressDialog;
+
 class MainWindow : public wxFrame {
     public:
 
         MainWindow();
 
         static std::string lowercaseStr(std::string input);
+
+        wxProgressDialog *progressDialog;
 
     protected:
 
@@ -64,6 +68,9 @@ class MainWindow : public wxFrame {
         void OnSyncDeleteFromServer(wxCommandEvent &evt);
         void OnSyncReset(wxCommandEvent &evt);
         void OnSyncShowKey(wxCommandEvent &evt);
+
+        void OnWorkerThreadProgress(wxThreadEvent& event);
+        void OnWorkerThreadCompleted(wxThreadEvent& event);
 
 
         // Helper classes
