@@ -585,7 +585,7 @@ void MainWindow::OnChangePass(wxCommandEvent &evt) {
     try {
         cout << string(passwordDialog1.GetValue()) << endl;
         st.SetPassphrase(string(passwordDialog1.GetValue()));
-        st.Save();
+        BackgroundSave();
     } catch(const Storage::Exception &stex) {
         wxMessageDialog errDialog(NULL, wxString("Error: "+ string(stex.what())), wxT("Error"), wxOK|wxCENTRE);
         errDialog.ShowModal();
@@ -668,9 +668,11 @@ void MainWindow::OnButtonRemove(wxCommandEvent &evt)
         string path = cur_record.GetPath();
         try {
             st.DeleteRecord(path);
-            st.Save();
+            
             UpdateRecordTree();
             SwitchToNoRecord();
+
+            BackgroundSave();
         } catch(const Storage::Exception &stex) {
             wxMessageDialog errDialog(NULL, wxString("Error: "+ string(stex.what())), wxT("Error"), wxOK|wxCENTRE);
             errDialog.ShowModal();
@@ -701,10 +703,12 @@ void MainWindow::OnButtonRename(wxCommandEvent &evt)
     if(recordNameDialog.ShowModal() == wxID_OK) {
         try {
             st.MoveRecord(string(recordNameDialog.GetValue()), cur_record.GetPath());
-            st.Save();
+            
             cur_record = st.GetRecord(string(recordNameDialog.GetValue()));
             UpdateRecordTree();
             UpdateRecordPanel();
+
+            BackgroundSave();
         } catch(const Storage::Exception &stex) {
             wxMessageDialog errDialog(NULL, wxString("Error: "+ string(stex.what())), wxT("Error"), wxOK|wxCENTRE);
             errDialog.ShowModal();
@@ -767,7 +771,8 @@ void MainWindow::OnButtonSaveChanges(wxCommandEvent &evt)
     if (confirmationDialog.ShowModal() == wxID_YES) {
         try {
             cur_record.SetNewFieldsToStorage(&st, guiRecord);
-            st.Save();
+            
+            BackgroundSave();
         } catch(const Storage::Exception &stex) {
             wxMessageDialog errDialog(NULL, wxString("Error: "+ string(stex.what())), wxT("Error"), wxOK|wxCENTRE);
             errDialog.ShowModal();
