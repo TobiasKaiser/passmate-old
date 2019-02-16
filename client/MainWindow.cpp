@@ -9,8 +9,10 @@
 #include <wx/splitter.h>
 #include <wx/sizer.h>
 #include <wx/clipbrd.h>
-#include <wx/textctrl.h>
 #include <wx/artprov.h>
+#include <wx/textctrl.h>
+
+#include "LicenseInfo.hpp"
 
 using namespace std;
 
@@ -167,6 +169,7 @@ void MainWindow::InitMenu()
 
     menuIdDoc = menuHelp->Append(wxID_ANY, wxT("&Documentation"))->GetId();
     menuIdHelp = menuHelp->Append(wxID_ANY, wxT("Visit &Website"))->GetId();
+    menuIdAbout = menuHelp->Append(wxID_ANY, wxT("&About"))->GetId();
 
     menuIdSyncSetupNewAccount =     menuSync->Append(wxID_ANY, wxT("Create &new account"))->GetId();
     menuIdSyncSetup =               menuSync->Append(wxID_ANY, wxT("&Connection to existing account"))->GetId();
@@ -183,6 +186,7 @@ void MainWindow::InitMenu()
     Connect(menuIdChangePass, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(MainWindow::OnChangePass));
     Connect(menuIdDoc, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(MainWindow::OnDoc));
     Connect(menuIdHelp, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(MainWindow::OnHelp));
+    Connect(menuIdAbout, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(MainWindow::OnAbout));
 
     Connect(menuIdSyncSetupNewAccount,  wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(MainWindow::OnSyncSetupNewAccount));
     Connect(menuIdSyncSetup,            wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(MainWindow::OnSyncSetup));
@@ -524,8 +528,25 @@ bool MainWindow::confirmPass() {
 // Event handler methods
 // ---------------------
 
+void MainWindow::OnAbout(wxCommandEvent& WXUNUSED(event))
+{
+    wxDialog dlg(this, wxID_ANY, "About");
 
-void MainWindow::OnChangePass(wxCommandEvent &evt) {
+    
+
+    wxTextCtrl *t = new wxTextCtrl(&dlg, wxID_ANY, LicenseInfo, wxDefaultPosition, wxDefaultSize, wxTE_READONLY|wxTE_MULTILINE);
+
+
+    wxBoxSizer *sizer = new wxBoxSizer(wxVERTICAL);
+    sizer->Add(t, 1, wxEXPAND); 
+    dlg.SetSizer(sizer);
+
+
+    dlg.ShowModal();
+}
+
+void MainWindow::OnChangePass(wxCommandEvent &evt)
+{
     SyncableStorage &st = wxGetApp().GetStorage();
 
     // Check previous passphrase
@@ -566,16 +587,19 @@ void MainWindow::OnChangePass(wxCommandEvent &evt) {
     }
 }
 
-void MainWindow::OnDoc(wxCommandEvent &evt) {
+void MainWindow::OnDoc(wxCommandEvent &evt)
+{
     wxLaunchDefaultBrowser("https://www.passmate.net/docs/", 0);
 }
 
-void MainWindow::OnHelp(wxCommandEvent &evt) {
+void MainWindow::OnHelp(wxCommandEvent &evt)
+{
     wxLaunchDefaultBrowser("https://www.passmate.net/", 0);
 }
 
 
-void MainWindow::OnQuit(wxCommandEvent &evt) {
+void MainWindow::OnQuit(wxCommandEvent &evt)
+{
     // menu
 
     Close(true);

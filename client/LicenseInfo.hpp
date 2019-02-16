@@ -1,0 +1,1 @@
+static wxString LicenseInfo = "Hello World!\nxyz!\nasdf";

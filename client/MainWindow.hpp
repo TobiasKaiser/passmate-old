@@ -37,6 +37,8 @@ class MainWindow : public wxFrame {
         // Event handler
         // -------------
 
+        void OnAbout(wxCommandEvent& event);
+
         void OnRecordActivated(wxTreeEvent& event);
         void OnButtonAddRecord(wxCommandEvent &evt);
         void OnButtonRemove(wxCommandEvent &evt);
@@ -127,7 +129,7 @@ class MainWindow : public wxFrame {
         wxButton *buttonRename;
         wxButton *buttonAddField;
 
-        int menuIdChangePass, menuIdDoc, menuIdHelp;
+        int menuIdChangePass, menuIdDoc, menuIdHelp, menuIdAbout;
 
         int menuIdSync, menuIdSyncSetup, menuIdSyncSetupNewAccount, menuIdSyncDeleteFromServer, menuIdSyncReset, menuIdSyncShowKey;
 
