@@ -145,6 +145,8 @@ MainWindow::MainWindow()
 
     Connect( wxEVT_SIZE, wxSizeEventHandler( MainWindow::OnSize ) );
 
+
+    CentreOnScreen();
     //panelRecord->ShowScrollbars(wxSHOW_SB_ALWAYS, wxSHOW_SB_ALWAYS);
 }
 
