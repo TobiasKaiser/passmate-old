@@ -37,6 +37,8 @@ class MainWindow : public wxFrame {
         bool isPasswordField(std::string key);
         bool confirmPass();
         
+        void BackgroundSave();
+
 
         // Event handler
         // -------------

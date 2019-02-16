@@ -543,6 +543,12 @@ void MainWindow::OnWorkerThreadProgress(wxThreadEvent& event) {
 void MainWindow::OnWorkerThreadCompleted(wxThreadEvent& event) {
     printf("Oh look at that! We got a thread completed event!\n");
     delete progressDialog;
+
+    // TODO: Error handling here a la
+    /*catch(const Storage::Exception &stex) {
+        wxMessageDialog errDialog(NULL, wxString("Error: "+ string(stex.what())), wxT("Error"), wxOK|wxCENTRE);
+        errDialog.ShowModal();
+    }*/
 }
 
 void MainWindow::OnChangePass(wxCommandEvent &evt) {
@@ -607,39 +613,39 @@ void MainWindow::OnClose(wxCommandEvent& WXUNUSED(event))
     Close(true);
 }
 
+void MainWindow::BackgroundSave() {
+
+    progressDialog = new wxProgressDialog("In progess", "Please wait...");
+
+    WorkerThread *t = new SaveStorageWorkerThread(this, &wxGetApp().GetStorage());
+    if ( t->Run() != wxTHREAD_NO_ERROR )
+    {
+        wxLogError("Can't create the thread!");
+        delete t;
+        t = NULL;
+    }
+    printf("Thread created!\n");
+}
+
 void MainWindow::OnButtonAddRecord(wxCommandEvent &evt)
 {
     SyncableStorage &st = wxGetApp().GetStorage();
-
 
     wxTextEntryDialog recordNameDialog(this, wxT("New record name:"));
     if (recordNameDialog.ShowModal() == wxID_OK) {
         string path(recordNameDialog.GetValue());
 
         try {
-            progressDialog = new wxProgressDialog("In progess", "Please wait...");
-
-            WorkerThread *t = new WorkerThread(this);
-            if ( t->Run() != wxTHREAD_NO_ERROR )
-            {
-                wxLogError("Can't create the thread!");
-                delete t;
-                t = NULL;
-            }
-            printf("Thread created!\n");
-
-
-            /*
 			// This needs to be done before creating a new value
 			// to prevent the software from crashing when it tries to select an entry from the record tree which is not shown due to filtering.
     		entryFilter->SetValue("");
 
             st.NewRecord(path);
-            st.Save();
             SwitchToRecord(path);
             UpdateRecordTree();
             recordTree->SelectItem(irt_root.FindByPath(path)->item_id);
-            */
+            
+            BackgroundSave();
 
         } catch(const Storage::Exception &stex) {
             wxMessageDialog errDialog(NULL, wxString("Error: "+ string(stex.what())), wxT("Error"), wxOK|wxCENTRE);

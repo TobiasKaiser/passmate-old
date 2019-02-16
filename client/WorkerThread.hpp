@@ -8,21 +8,24 @@ wxDECLARE_EVENT(wxEVT_WorkerThreadProgress, wxThreadEvent);
 
 
 class MainWindow;
+class SyncableStorage;
 
 class WorkerThread : public wxThread
 {
-public: 
+public:
     WorkerThread(MainWindow *handler)
         : wxThread(wxTHREAD_DETACHED)
-        { m_pHandler = handler; }
+    {
+        mainWindow = handler;
+    }
     ~WorkerThread();
 
-    SendProgressUpdate(std::string message, int progress);
+    void SendProgressUpdate(std::string message, int progress);
 
     class ProgressData {
         public:
             ProgressData() {};
-            ProgressData(std::string message, double progress) {
+            ProgressData(std::string message, int progress) {
                 this->message = message;
                 this->progress = progress;
             }
@@ -31,5 +34,18 @@ public:
     };
 protected:
     virtual ExitCode Entry();
-    MainWindow *m_pHandler;
+    MainWindow *mainWindow;
+
+    virtual void DoTask();
+};
+
+class SaveStorageWorkerThread : public WorkerThread
+{
+public:
+    SaveStorageWorkerThread(MainWindow *handler, SyncableStorage *st) : WorkerThread(handler) {
+        this->st = st;
+    }
+protected:
+    void DoTask();
+    SyncableStorage *st;
 };
