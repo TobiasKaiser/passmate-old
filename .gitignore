@@ -3,3 +3,4 @@
 *.d
 *.d.*
 .DS_store
+doc/_build/

@@ -10,7 +10,8 @@ Welcome to Passmate's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-
+   encryption
+   old/index
 
 Indices and tables
 ==================

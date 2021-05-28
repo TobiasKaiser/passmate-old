@@ -1,7 +1,5 @@
 # Passmate
 
-![Screenshot](doc/passmate.png)
-
 This is a cross-platform, open-source password manager with the following features:
 - Synchronization and secure storage on the sync server. For storage on the sync server, your passwords are AES256-encrypted with a random key. 
 	- Either use the public available sync server `sync.passmate.net` or set up your own (it's a small Python script).
