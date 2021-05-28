@@ -1,1 +1,0 @@
-extern char *MiniCA_BuiltInCert;
