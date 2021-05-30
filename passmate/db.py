@@ -66,12 +66,14 @@ class DatabaseContainer:
 
 
     def save(self, create=False):
-        data_plain = self.pad_string(json.dumps(self.data))
+        data_plain = json.dumps(self.data)
 
         if self.is_scrypt_container:
             assert not self.requires_passphrase
 
-            data_scrypt = scrypt.encrypt(data_plain, self.passphrase,
+            data_plain_padded = self.pad_string(data_plain)
+
+            data_scrypt = scrypt.encrypt(data_plain_padded, self.passphrase,
                 maxtime=self.maxtime, maxmem=self.maxmem, maxmemfrac=self.maxmemfrac)
 
             with open(self.fn, "xb" if create else "wb") as f:
@@ -81,4 +83,5 @@ class DatabaseContainer:
                 f.write(data_plain)
 
 class Database:
-    pass
+    def __init__(self, container):
+        self.container=container

@@ -1,8 +1,39 @@
 from .db import *
 import getpass
 import argparse
+import cmd
 
-def main():
+class CLI(cmd.Cmd):
+
+    def __init__(self, db):
+        super().__init__()
+        self.cur_record = None
+        self.db = db
+
+    @property
+    def prompt(self):
+        if self.cur_record:
+            return f"pmate:{self.cur_record}>"
+        else:
+            return "pmate> "
+    
+
+    def do_get_json(self, arg):
+        """Print container JSON"""
+        print(self.db.container.data)
+
+    def do_save(self, arg):
+        """Save container"""
+        self.db.container.save()
+
+    def do_quit(self, arg):
+        """Exit passmate CLI"""
+        return True
+
+    def do_EOF(self, arg):
+        return True
+
+def cli_get_db():
     ap = argparse.ArgumentParser()
     ap.add_argument("container", nargs="?", help="Password database container file")
     ap.add_argument("-c", "--create", action="store_true", help="Create new password container file")
@@ -11,7 +42,7 @@ def main():
     if args.container:
         container_fn = args.container
     else:
-        container_fn = get_default_container_fn()
+        container_fn = DatabaseContainer.get_default_container_fn()
 
     container = DatabaseContainer(container_fn)
 
@@ -24,10 +55,13 @@ def main():
         container.create(passphrase1)
 
     else:
-        
         container.open()
         while container.requires_passphrase:
             passphrase = getpass.getpass(f'Passphrase to open {container_fn}: ')
             container.decrypt(passphrase)
 
-    container.save()
+    return Database(container)
+
+def main():
+    db = cli_get_db()
+    CLI(db).cmdloop()
