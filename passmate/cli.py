@@ -2,15 +2,12 @@ from .db import Database
 from .container import DatabaseContainer
 import getpass
 import argparse
+import collections
 from .hierarchy import PathHierarchy
 
 from prompt_toolkit import prompt, PromptSession
 from prompt_toolkit.completion import Completer, Completion
 from prompt_toolkit.shortcuts import CompleteStyle
-
-
-
-
 from prompt_toolkit.filters import completion_is_selected, has_completions
 from prompt_toolkit.key_binding import KeyBindings
 
@@ -23,40 +20,46 @@ class PromptCompleter(Completer):
         self.hier = PathHierarchy(cli.db)
 
 
-    def complete(self, text, command_handlers, default_handler):
-        if not " " in text:
-            for c in command_handlers.keys():
-                if c.startswith(text):
-                    yield  Completion(c, start_position=-len(text), style='fg:ansired')
-
-        for cmd, handler in command_handlers.items():
-            if text.startswith(cmd+" "):
-                if handler:
-                    for comp in handler(text[len(cmd)+1:]):
-                        yield comp
-                return
-
-        for comp in default_handler(text):
-            yield comp
 
     def get_completions(self, document, complete_event):
         # Complete only at end of line:
         if document.cursor_position!=len(document.text):
             return
 
-        if self.cli.cur_path:
-            pass
-        else:
-            for comp in self.complete(document.text,
-                {
-                    "new":self.path_handler,
-                    "chpass":None,
-                },
-                default_handler=self.path_handler):
+        text = document.text
+
+        # Complete command names
+        if not " " in text:
+            for c in self.cli.commands:
+                if not c.context_check(self.cli):
+                    continue
+                if not c.cmd:
+                    continue
+                if c.cmd.startswith(text):
+                    yield  Completion(c.cmd, start_position=-len(text), style='fg:ansired')
+
+        default_cmd = None
+
+        # Call command handlers if applicable
+        for c in self.cli.commands:
+            if not c.context_check(self.cli):
+                continue
+            if not c.cmd:
+                assert not default_cmd
+                default_cmd = c
+                continue
+            if text.startswith(c.cmd+" "):
+                if c.completion_handler:
+                    for comp in c.completion_handler(self, text[len(c.cmd)+1:]):
+                        yield comp
+                return
+
+        # Call default handler else
+        if default_cmd and default_cmd.completion_handler:
+            for comp in default_cmd.completion_handler(self, text):
                 yield comp
 
-
-    def path_handler(self, text):
+    def handle_path(self, text):
 
         start_idx=text.rfind("/")
 
@@ -74,9 +77,53 @@ class PromptCompleter(Completer):
                 yield Completion(subdir, start_position=-len(var), style='fg:ansiblue')
         for record in cur_dir.records.keys():
             if record.startswith(var):
-                yield Completion(record, start_position=-len(var), style='fg:ansiblack')
+                yield Completion(record, start_position=-len(var))
             
 class CLI:
+
+    Command = collections.namedtuple('Command', ['cmd', 'context_check', 'handler', 'completion_handler'])
+
+
+    def cmd_new(self, args):
+        print(f"new {args}!")
+
+    def cmd_return(self, args):
+        self.cur_path = None
+
+    def cmd_chpass(self, args):
+        print("chpass!")
+
+    def cmd_enter(self, args):
+        if len(args)>0:
+            self.cur_path = args
+
+            self.cmd_show("")
+
+    def cmd_show(self, args):
+        if self.cur_path in self.db.records:
+            rec = self.db.records[self.cur_path]
+            maxlen = max(map(len, rec.fields.keys()))
+            for name, values in rec.fields.items():
+                print(f"{name:>{maxlen}}: {values[0]}")
+                for v in values[1:]:
+                    nothing=""
+                    print(f"{nothing:>{maxlen}}> {v}")
+        else:
+            print("No record at current path.")
+
+    def cmd_exit(self, args):
+        return True
+
+    commands = [
+        Command("new",    lambda cli: not cli.cur_path, cmd_new, PromptCompleter.handle_path),
+        Command("chpass", lambda cli: not cli.cur_path, cmd_chpass, None),
+        Command(None,     lambda cli: not cli.cur_path, cmd_enter, PromptCompleter.handle_path),
+        Command("return", lambda cli:     cli.cur_path, cmd_return, None),
+        Command(None,     lambda cli:     cli.cur_path, cmd_return, None),
+        Command("show",   lambda cli:     cli.cur_path, cmd_show, None),
+        Command("exit",   lambda cli: True,             cmd_exit, None),
+
+    ]
 
     def key_bindings(self):
         key_bindings = KeyBindings()
@@ -95,14 +142,37 @@ class CLI:
         self.db = db
         self.cur_path=None
 
+    def handle_cmd(self, text):
+        default_cmd = None
+
+        # Call command handlers if applicable
+        for c in self.commands:
+            if not c.context_check(self):
+                continue
+            if not c.cmd:
+                assert not default_cmd
+                default_cmd = c
+                continue
+            if text.startswith(c.cmd):
+                return c.handler(self, text[len(c.cmd)+1:])
+
+        # Call default handler else
+        if default_cmd:
+            return default_cmd.handler(self, text)
+
     def run(self):
         running = True
-        session = PromptSession(key_bindings=self.key_bindings(), complete_style=CompleteStyle.MULTI_COLUMN)
+        session = PromptSession(key_bindings=self.key_bindings(), complete_style=CompleteStyle.READLINE_LIKE)
 
         while running:
             my_completer=PromptCompleter(self)
-            text = session.prompt('passmate> ', completer=my_completer,
-              complete_while_typing=True)
+            pathinfo=""
+            if self.cur_path:
+                pathinfo=":"+self.cur_path
+            text = session.prompt(f'passmate{pathinfo}> ', completer=my_completer, complete_while_typing=True)
+
+            if self.handle_cmd(text):
+                running=False
 
 
 
