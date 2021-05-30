@@ -20,7 +20,7 @@ class CLI(cmd.Cmd):
 
     @property
     def prompt(self):
-        return f"pmate:{self.cur_path}>"
+        return f"pmate:{self.cur_path}> "
         
 
     def do_get_json(self, arg):
@@ -39,17 +39,13 @@ class CLI(cmd.Cmd):
         return True
 
     def do_ls(self, arg):
-        h = PathHierarchy(self.db, self.cur_path)
-        dirs, recs = h.listdir()
-        i=1
-        for d in dirs:
-            print(f"{i:>3} {Color.Blue}{d}{Color.Clear}/")
-            i+=1
-        for r in recs:
-            print(f"{i:>3} {r}")
-            i+=1
+        h = PathHierarchy(self.db, arg)
+        h.print()
 
-    def do_show(self, arg):
+    def do_record(self, arg):
+        if arg:
+            self.cur_path = arg
+
         if self.cur_path in self.db.records:
             rec = self.db.records[self.cur_path]
             maxlen = max(map(len, rec.fields.keys()))
@@ -58,16 +54,18 @@ class CLI(cmd.Cmd):
                 for v in values[1:]:
                     nothing=""
                     print(f"{nothing:>{maxlen}}> {v}")
+        else:
+            print("No record at current path.")
 
-    def do_cd(self, arg):
-        return self.default(arg+"/")
+    def complete_record(self, text, line, begidx, endidx):
+        h = PathHierarchy(self.db)
+        return h.tab_complete(text)
 
-    def default(self, arg):
-        h = PathHierarchy(self.db, self.cur_path)
-        self.cur_path = h.chdir(arg)
 
-    def do_open(self, arg):
-        pass
+    def do_tab(self, text):
+        h = PathHierarchy(self.db)
+        print(h.tab_complete(text))
+
 
 def cli_get_db():
     ap = argparse.ArgumentParser()
