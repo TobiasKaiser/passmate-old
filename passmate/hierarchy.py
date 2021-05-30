@@ -3,12 +3,12 @@
 class Directory:
     def __init__(self, parent):
         self.parent = parent
-        self.sub_directories={}
+        self.subdirs={}
         self.records={}
 
     def print(self, prefix):
-        for idx, (name, subdir) in enumerate(self.sub_directories.items()):
-            last = (idx == len(self.sub_directories)-1) and len(self.records)==0
+        for idx, (name, subdir) in enumerate(self.subdirs.items()):
+            last = (idx == len(self.subdirs)-1) and len(self.records)==0
             if last:
                 boxchar_self = "╰─┬"
                 boxchar_children = "  "
@@ -56,9 +56,9 @@ class PathHierarchy:
     def get_subdirectory(self, dirs):
         dir_iter = self.root
         for d in dirs:
-            if not d in dir_iter.sub_directories:
-                dir_iter.sub_directories[d] = Directory(dir_iter)
-            dir_iter = dir_iter.sub_directories[d]
+            if not d in dir_iter.subdirs:
+                dir_iter.subdirs[d] = Directory(dir_iter)
+            dir_iter = dir_iter.subdirs[d]
         return dir_iter
 
     def tab_complete(self, prefix):
@@ -71,7 +71,7 @@ class PathHierarchy:
 #class Directory:
 #    def __init__(self, parent):
 #        self.parent = parent
-#        self.sub_directories={}
+#        self.subdirs={}
 #        self.records={}
 #
 #class PathHierarchy:
@@ -89,7 +89,7 @@ class PathHierarchy:
 #
 #    def listdir(self):
 #        d = self.get_subdirectory(self.cur_dir)
-#        return d.sub_directories.keys(), d.records.keys()
+#        return d.subdirs.keys(), d.records.keys()
 #
 #
 #    def update_hierarchy(self):
@@ -120,6 +120,6 @@ class PathHierarchy:
 #                # Interpret it as a leaf if there is a leaf or no folder
 #                alt_dir, alt_leaf = self.cur_dir[:-1], self.cur_dir[-1]
 #                alt_subdir = self.get_subdirectory(alt_dir)
-#                if (alt_leaf in alt_subdir.records) or not (alt_leaf in alt_subdir.sub_directories):
+#                if (alt_leaf in alt_subdir.records) or not (alt_leaf in alt_subdir.subdirs):
 #                    self.cur_dir, self.cur_leaf = alt_dir, alt_leaf
 #        return "/".join(self.cur_dir+[self.cur_leaf])

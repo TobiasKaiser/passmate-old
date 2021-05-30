@@ -2,69 +2,74 @@ from .db import Database
 from .container import DatabaseContainer
 import getpass
 import argparse
-import cmd
 from .hierarchy import PathHierarchy
 
-class Color:
-    Blue = '\033[94m'
-    Green = '\033[92m'
-    Clear = '\033[0m'
-    
-class CLI(cmd.Cmd):
+from prompt_toolkit import prompt, PromptSession
+from prompt_toolkit.completion import Completer, Completion
+from prompt_toolkit.shortcuts import CompleteStyle
 
+
+
+
+from prompt_toolkit.filters import completion_is_selected, has_completions
+from prompt_toolkit.key_binding import KeyBindings
+
+
+
+class PromptCompleter(Completer):
+    def __init__(self, cli):
+        super().__init__()
+        self.cli = cli
+        self.hier = PathHierarchy(cli.db)
+
+    def get_completions(self, document, complete_event):
+        for comp in self.path_complete(document, complete_event):
+            yield comp
+
+    def path_complete(self, document, complete_event):
+        start_idx=document.text.rfind("/")
+        var=document.text[start_idx+1:]
+        cur_dir = self.hier.root
+        if start_idx>=0:
+            for dirname in document.text.split("/")[:-1]:
+                try:
+                    cur_dir = cur_dir.subdirs[dirname]
+                except KeyError:
+                    return
+        comp_paths = list(map(lambda d:d+"/", cur_dir.subdirs.keys()))
+        comp_recs = list(cur_dir.records.keys())
+        complete = comp_paths+comp_recs
+        for c in complete:
+            if c.startswith(var):
+                yield Completion(c, start_position=-len(var))
+
+class CLI:
+    def key_bindings(self):
+        key_bindings = KeyBindings()
+
+        @key_bindings.add("enter", filter=has_completions & ~completion_is_selected)
+        def _(event):
+            event.current_buffer.go_to_completion(0)
+            event.current_buffer.complete_state = None
+
+        @key_bindings.add("enter", filter=completion_is_selected)
+        def _(event):
+            event.current_buffer.complete_state = None
+        return key_bindings
 
     def __init__(self, db):
-        super().__init__()
-        self.cur_path = ""
         self.db = db
 
-    @property
-    def prompt(self):
-        return f"pmate:{self.cur_path}> "
-        
+    def run(self):
+        running = True
+        session = PromptSession(key_bindings=self.key_bindings(), complete_style=CompleteStyle.MULTI_COLUMN)
 
-    def do_get_json(self, arg):
-        """Print container JSON"""
-        print(self.db.container.data)
-
-    def do_save(self, arg):
-        """Save container"""
-        self.db.container.save()
-
-    def do_quit(self, arg):
-        """Exit passmate CLI"""
-        return True
-
-    def do_EOF(self, arg):
-        return True
-
-    def do_ls(self, arg):
-        h = PathHierarchy(self.db, arg)
-        h.print()
-
-    def do_record(self, arg):
-        if arg:
-            self.cur_path = arg
-
-        if self.cur_path in self.db.records:
-            rec = self.db.records[self.cur_path]
-            maxlen = max(map(len, rec.fields.keys()))
-            for name, values in rec.fields.items():
-                print(f"{Color.Green}{name:>{maxlen}}{Color.Clear}: {values[0]}")
-                for v in values[1:]:
-                    nothing=""
-                    print(f"{nothing:>{maxlen}}> {v}")
-        else:
-            print("No record at current path.")
-
-    def complete_record(self, text, line, begidx, endidx):
-        h = PathHierarchy(self.db)
-        return h.tab_complete(text)
+        while running:
+            my_completer=PromptCompleter(self)
+            text = session.prompt('passmate> ', completer=my_completer,
+              complete_while_typing=True)
 
 
-    def do_tab(self, text):
-        h = PathHierarchy(self.db)
-        print(h.tab_complete(text))
 
 
 def cli_get_db():
@@ -98,4 +103,6 @@ def cli_get_db():
 
 def main():
     db = cli_get_db()
-    CLI(db).cmdloop()
+    CLI(db).run()
+
+    
