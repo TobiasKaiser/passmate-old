@@ -10,7 +10,8 @@ setuptools.setup(
     python_requires=">=3.6",
     entry_points={
         "console_scripts": [
-            "passmate = passmate.gui.gui:main"
+            "passmate-qt = passmate.gui.gui:main",
+            "passmate    = passmate.cli:main"
         ]
     }
 )
