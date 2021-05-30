@@ -22,28 +22,62 @@ class PromptCompleter(Completer):
         self.cli = cli
         self.hier = PathHierarchy(cli.db)
 
-    def get_completions(self, document, complete_event):
-        for comp in self.path_complete(document, complete_event):
+
+    def complete(self, text, command_handlers, default_handler):
+        if not " " in text:
+            for c in command_handlers.keys():
+                if c.startswith(text):
+                    yield  Completion(c, start_position=-len(text), style='fg:ansired')
+
+        for cmd, handler in command_handlers.items():
+            if text.startswith(cmd+" "):
+                if handler:
+                    for comp in handler(text[len(cmd)+1:]):
+                        yield comp
+                return
+
+        for comp in default_handler(text):
             yield comp
 
-    def path_complete(self, document, complete_event):
-        start_idx=document.text.rfind("/")
-        var=document.text[start_idx+1:]
+    def get_completions(self, document, complete_event):
+        # Complete only at end of line:
+        if document.cursor_position!=len(document.text):
+            return
+
+        if self.cli.cur_path:
+            pass
+        else:
+            for comp in self.complete(document.text,
+                {
+                    "new":self.path_handler,
+                    "chpass":None,
+                },
+                default_handler=self.path_handler):
+                yield comp
+
+
+    def path_handler(self, text):
+
+        start_idx=text.rfind("/")
+
+        var=text[start_idx+1:]
         cur_dir = self.hier.root
         if start_idx>=0:
-            for dirname in document.text.split("/")[:-1]:
+            for dirname in text.split("/")[:-1]:
                 try:
                     cur_dir = cur_dir.subdirs[dirname]
                 except KeyError:
                     return
-        comp_paths = list(map(lambda d:d+"/", cur_dir.subdirs.keys()))
-        comp_recs = list(cur_dir.records.keys())
-        complete = comp_paths+comp_recs
-        for c in complete:
-            if c.startswith(var):
-                yield Completion(c, start_position=-len(var))
-
+        for subdir in cur_dir.subdirs.keys():
+            subdir=subdir+"/"
+            if subdir.startswith(var):
+                yield Completion(subdir, start_position=-len(var), style='fg:ansiblue')
+        for record in cur_dir.records.keys():
+            if record.startswith(var):
+                yield Completion(record, start_position=-len(var), style='fg:ansiblack')
+            
 class CLI:
+
     def key_bindings(self):
         key_bindings = KeyBindings()
 
@@ -59,6 +93,7 @@ class CLI:
 
     def __init__(self, db):
         self.db = db
+        self.cur_path=None
 
     def run(self):
         running = True
