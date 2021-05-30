@@ -4,8 +4,12 @@ import getpass
 import argparse
 import cmd
 from .hierarchy import PathHierarchy
-from termcolor import colored
 
+class Color:
+    Blue = '\033[94m'
+    Green = '\033[92m'
+    Clear = '\033[0m'
+    
 class CLI(cmd.Cmd):
 
 
@@ -39,8 +43,7 @@ class CLI(cmd.Cmd):
         dirs, recs = h.listdir()
         i=1
         for d in dirs:
-            colored_d = colored(d, "blue", attrs=["bold"])
-            print(f"{i:>3} {colored_d}/")
+            print(f"{i:>3} {Color.Blue}{d}{Color.Clear}/")
             i+=1
         for r in recs:
             print(f"{i:>3} {r}")
@@ -51,8 +54,7 @@ class CLI(cmd.Cmd):
             rec = self.db.records[self.cur_path]
             maxlen = max(map(len, rec.fields.keys()))
             for name, values in rec.fields.items():
-                name_colored = colored(name, "green")
-                print(f"{name_colored:>{maxlen+9}}: {values[0]}")
+                print(f"{Color.Green}{name:>{maxlen}}{Color.Clear}: {values[0]}")
                 for v in values[1:]:
                     nothing=""
                     print(f"{nothing:>{maxlen}}> {v}")
