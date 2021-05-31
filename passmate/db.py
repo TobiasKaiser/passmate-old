@@ -67,8 +67,14 @@ class DatabaseUpdate:
             assert False # Unexpected raw_field_name in update
 
     def __repr__(self):
-        return f"<DatabaseUpdate {self.describe()}>"
-
+        return f"<DatabaseUpdate db_key={self.db_key} {self.describe()}>"
+    
+    def apply(self, db_recs, timestamp):
+        if not self.db_key in db_recs:
+            db_recs[self.db_key] = []
+        db_recs[self.db_key].append(
+            [self.raw_field_name, timestamp] + self.raw_field_values
+        )
 
 class Record:
     """
@@ -79,7 +85,7 @@ class Record:
 
     @staticmethod
     def random_key():
-        return base64.b16encode(get_random_bytes(8))
+        return base64.b16encode(get_random_bytes(8)).decode("ascii")
 
     def __init__(self, db, db_key=None, db_tuples=None):
         self.db = db
@@ -98,6 +104,10 @@ class Record:
         # .fields are the working copy,
         # .db_fields and .db_path remeber the db state.
         self.fields=copy.deepcopy(self.db_fields)
+
+    def mark_as_up_to_date(self):
+        self.db_fields = copy.deepcopy(self.fields)
+        self.db_path = self.get_cur_path()
     
     def get_cur_path(self):
         cur_path = None
@@ -152,6 +162,15 @@ class Database:
         for r in self.records.values():
             updates+=r.get_updates()
         return updates
+
+    def update(self):
+        t = int(time.time())
+        for u in self.get_updates():
+            u.apply(self.container.data[0], t)
+
+        for r in self.records.values():
+            r.mark_as_up_to_date()
+
 
     def read_container(self):
         """Transforms the container JSON into .records, a dict of Records."""

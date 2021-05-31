@@ -84,6 +84,7 @@ class DatabaseContainer:
         """Save container. To ensure that no inconsistent database is written
         even in the event of a crash, a new container file is written and then
         moved to replace the previous container file."""
+
         data_plain = json.dumps(self.data)
 
         if self.is_scrypt_container:

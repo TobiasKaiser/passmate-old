@@ -76,7 +76,7 @@ class PromptCompleter(Completer):
                 yield Completion(record, start_position=-len(var))
     
     def handle_field_name(self, text):
-        return
+        pass
 
 class CLI:
 
@@ -97,12 +97,19 @@ class CLI:
             return
 
         rec = self.db.records[self.cur_path]
-        maxlen = max(map(len, rec.fields.keys()))
-        for name, values in rec.fields.items():
-            print(f"{name:>{maxlen}}: {values[0]}")
-            for v in values[1:]:
-                nothing=""
-                print(f"{nothing:>{maxlen}}> {v}")
+        if len(rec.fields)==0:
+            print("Record is empty.")
+        else:
+            maxlen = max(map(len, rec.fields.keys()))
+            for name, values in rec.fields.items():
+                print(f"{name:>{maxlen}}: {values[0]}")
+                for v in values[1:]:
+                    nothing=""
+                    print(f"{nothing:>{maxlen}}> {v}")
+
+    def cmd_ls(self, args):
+        h = PathHierarchy(self.db, searchterm=args)
+        h.print()
 
     # Todo
 
@@ -138,30 +145,29 @@ class CLI:
             print("?")
             retun
 
-
-        print(self.db.get_updates())
-
+        self.db.update()
+        self.db.container.save()
 
 
     commands = [
         # Commands in root mode
-        Command(None,     lambda cli: not cli.cur_path, cmd_show, PromptCompleter.handle_path),
+        Command(None,     lambda cli: not cli.cur_path, cmd_show,   PromptCompleter.handle_path),
 
         # Commands in leaf mode
-        Command("set",    lambda cli:     cli.cur_path, cmd_set, PromptCompleter.handle_field_name),
-        Command("unset",  lambda cli:     cli.cur_path, cmd_unset, PromptCompleter.handle_field_name),
+        Command("set",    lambda cli:     cli.cur_path, cmd_set,    PromptCompleter.handle_field_name),
+        Command("unset",  lambda cli:     cli.cur_path, cmd_unset,  PromptCompleter.handle_field_name),
         Command("rename", lambda cli:     cli.cur_path, cmd_rename, PromptCompleter.handle_path),
         Command("return", lambda cli:     cli.cur_path, cmd_return, None),
         Command(None,     lambda cli:     cli.cur_path, cmd_return, None),
 
         # Commands that work always
-        Command("show",   lambda cli: True,             cmd_show, PromptCompleter.handle_path),
-        Command("save",   lambda cli: True,             cmd_save, None),
-        Command("exit",   lambda cli: True,             cmd_exit, None),
-        Command("new",    lambda cli: True,             cmd_new, PromptCompleter.handle_path),
-        Command("del",    lambda cli: True,             cmd_del, PromptCompleter.handle_path),
+        Command("show",   lambda cli: True,             cmd_show,   PromptCompleter.handle_path),
+        Command("ls",     lambda cli: True,             cmd_ls,     None),
+        Command("save",   lambda cli: True,             cmd_save,   None),
+        Command("exit",   lambda cli: True,             cmd_exit,   None),
+        Command("new",    lambda cli: True,             cmd_new,    PromptCompleter.handle_path),
+        Command("del",    lambda cli: True,             cmd_del,    PromptCompleter.handle_path),
         Command("chpass", lambda cli: True,             cmd_chpass, None),
-
     ]
 
     def key_bindings(self):
