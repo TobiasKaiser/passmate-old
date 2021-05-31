@@ -2,6 +2,9 @@ import copy
 import collections
 import time
 
+from Cryptodome.Random import get_random_bytes
+import base64
+
 class FieldTuples:
     FieldValue = collections.namedtuple('FieldValue', ['time', 'value'])
     
@@ -74,9 +77,16 @@ class Record:
     db_path: Remembers path as read from container
     """
 
-    def __init__(self, db, db_key, db_tuples=None):
+    @staticmethod
+    def random_key():
+        return base64.b16encode(get_random_bytes(8))
+
+    def __init__(self, db, db_key=None, db_tuples=None):
         self.db = db
-        self.db_key = db_key
+        if db_key:
+            self.db_key = db_key
+        else:
+            self.db_key = self.random_key()
 
         if db_tuples:
             self.db_fields=db_tuples.get_fields()
@@ -111,7 +121,7 @@ class Record:
         db_field_names  = set(self.db_fields.keys())
         cur_field_names = set(self.fields.keys())
 
-        for field_name in db_field_names + cur_field_names:
+        for field_name in db_field_names | cur_field_names:
             update_value = None
             if not (field_name in cur_field_names):
                 # Delete field:
@@ -136,6 +146,12 @@ class Database:
     def __init__(self, container):
         self.container=container
         self.read_container()
+
+    def get_updates(self):
+        updates = []
+        for r in self.records.values():
+            updates+=r.get_updates()
+        return updates
 
     def read_container(self):
         """Transforms the container JSON into .records, a dict of Records."""

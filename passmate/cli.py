@@ -1,4 +1,4 @@
-from .db import Database
+from .db import Database, Record
 from .container import DatabaseContainer
 import getpass
 import argparse
@@ -11,15 +11,11 @@ from prompt_toolkit.shortcuts import CompleteStyle
 from prompt_toolkit.filters import completion_is_selected, has_completions
 from prompt_toolkit.key_binding import KeyBindings
 
-
-
 class PromptCompleter(Completer):
     def __init__(self, cli):
         super().__init__()
         self.cli = cli
         self.hier = PathHierarchy(cli.db)
-
-
 
     def get_completions(self, document, complete_event):
         # Complete only at end of line:
@@ -78,50 +74,93 @@ class PromptCompleter(Completer):
         for record in cur_dir.records.keys():
             if record.startswith(var):
                 yield Completion(record, start_position=-len(var))
-            
+    
+    def handle_field_name(self, text):
+        return
+
 class CLI:
 
     Command = collections.namedtuple('Command', ['cmd', 'context_check', 'handler', 'completion_handler'])
 
-
-    def cmd_new(self, args):
-        print(f"new {args}!")
-
     def cmd_return(self, args):
         self.cur_path = None
-
-    def cmd_chpass(self, args):
-        print("chpass!")
-
-    def cmd_enter(self, args):
-        if len(args)>0:
-            self.cur_path = args
-
-            self.cmd_show("")
-
-    def cmd_show(self, args):
-        if self.cur_path in self.db.records:
-            rec = self.db.records[self.cur_path]
-            maxlen = max(map(len, rec.fields.keys()))
-            for name, values in rec.fields.items():
-                print(f"{name:>{maxlen}}: {values[0]}")
-                for v in values[1:]:
-                    nothing=""
-                    print(f"{nothing:>{maxlen}}> {v}")
-        else:
-            print("No record at current path.")
 
     def cmd_exit(self, args):
         return True
 
+    def cmd_show(self, args):
+        if len(args)>0:
+            self.cur_path = args
+
+        if not (self.cur_path in self.db.records):
+            print("No record at current path.")
+            return
+
+        rec = self.db.records[self.cur_path]
+        maxlen = max(map(len, rec.fields.keys()))
+        for name, values in rec.fields.items():
+            print(f"{name:>{maxlen}}: {values[0]}")
+            for v in values[1:]:
+                nothing=""
+                print(f"{nothing:>{maxlen}}> {v}")
+
+    # Todo
+
+    def cmd_set(self, args):
+        print(f"todo: set {args}")
+
+    def cmd_unset(self, args):
+        print(f"todo: unset {args}")
+
+    def cmd_rename(self, args):
+        print(f"todo: unset {args}")
+
+    def cmd_new(self, args):
+        if len(args)==0:
+            print("?")
+
+        if (args in self.db.records):
+            print("Record already exists.")
+            return
+
+        self.cur_path = args
+
+        self.db.records[self.cur_path] = Record(self.db)
+
+    def cmd_del(self, args):
+        print(f"todo: new {args}")
+
+    def cmd_chpass(self, args):
+        print(f"todo: chpass {args}")
+
+    def cmd_save(self, args):
+        if len(args)>0:
+            print("?")
+            retun
+
+
+        print(self.db.get_updates())
+
+
+
     commands = [
-        Command("new",    lambda cli: not cli.cur_path, cmd_new, PromptCompleter.handle_path),
-        Command("chpass", lambda cli: not cli.cur_path, cmd_chpass, None),
-        Command(None,     lambda cli: not cli.cur_path, cmd_enter, PromptCompleter.handle_path),
+        # Commands in root mode
+        Command(None,     lambda cli: not cli.cur_path, cmd_show, PromptCompleter.handle_path),
+
+        # Commands in leaf mode
+        Command("set",    lambda cli:     cli.cur_path, cmd_set, PromptCompleter.handle_field_name),
+        Command("unset",  lambda cli:     cli.cur_path, cmd_unset, PromptCompleter.handle_field_name),
+        Command("rename", lambda cli:     cli.cur_path, cmd_rename, PromptCompleter.handle_path),
         Command("return", lambda cli:     cli.cur_path, cmd_return, None),
         Command(None,     lambda cli:     cli.cur_path, cmd_return, None),
-        Command("show",   lambda cli:     cli.cur_path, cmd_show, None),
+
+        # Commands that work always
+        Command("show",   lambda cli: True,             cmd_show, PromptCompleter.handle_path),
+        Command("save",   lambda cli: True,             cmd_save, None),
         Command("exit",   lambda cli: True,             cmd_exit, None),
+        Command("new",    lambda cli: True,             cmd_new, PromptCompleter.handle_path),
+        Command("del",    lambda cli: True,             cmd_del, PromptCompleter.handle_path),
+        Command("chpass", lambda cli: True,             cmd_chpass, None),
 
     ]
 
@@ -207,7 +246,10 @@ def cli_get_db():
     return Database(container)
 
 def main():
+
+
     db = cli_get_db()
     CLI(db).run()
 
     
+
