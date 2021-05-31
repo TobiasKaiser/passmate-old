@@ -144,7 +144,7 @@ class Record:
                 update_value = self.fields[field_name]
 
             if update_value != None:
-                updates.append(DatabaseUpdate(self.db_key, "_"+field_name), update_value)
+                updates.append(DatabaseUpdate(self.db_key, "_"+field_name, update_value))
 
         return updates
 

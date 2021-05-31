@@ -76,11 +76,12 @@ class PromptCompleter(Completer):
                 yield Completion(record, start_position=-len(var))
     
     def handle_field_name(self, text):
-        pass
+        for key in self.cli.cur_rec.fields.keys():
+            if key.startswith(text):
+                yield Completion(key, start_position=-len(text))
+
 
 class CLI:
-
-    Command = collections.namedtuple('Command', ['cmd', 'context_check', 'handler', 'completion_handler'])
 
     def cmd_return(self, args):
         self.cur_path = None
@@ -90,11 +91,15 @@ class CLI:
 
     def cmd_show(self, args):
         if len(args)>0:
-            self.cur_path = args
 
-        if not (self.cur_path in self.db.records):
-            print("No record at current path.")
+            if args in self.db.records:
+                self.cur_path = args
+            else:
+                print("Record not found.")
+                return
+        elif not self.cur_path:
             return
+
 
         rec = self.db.records[self.cur_path]
         if len(rec.fields)==0:
@@ -111,13 +116,30 @@ class CLI:
         h = PathHierarchy(self.db, searchterm=args)
         h.print()
 
+    def cmd_set(self, field_name):
+        if len(field_name)==0:
+            print("?")
+            return
+
+        if field_name in self.cur_rec.fields and len(self.cur_rec.fields[field_name])==1:
+            old_value = self.cur_rec.fields[field_name][0]
+        else:
+            old_value = ""
+
+        # Only support setting a single value for now
+
+        new_value = prompt("Value: ", default=old_value)
+
+        self.cur_rec.fields[field_name] = [new_value]
+
+    def cmd_unset(self, field_name):
+        if len(field_name)==0:
+            print("?")
+            return
+
+        del self.cur_rec.fields[field_name]
+
     # Todo
-
-    def cmd_set(self, args):
-        print(f"todo: set {args}")
-
-    def cmd_unset(self, args):
-        print(f"todo: unset {args}")
 
     def cmd_rename(self, args):
         print(f"todo: unset {args}")
@@ -143,10 +165,12 @@ class CLI:
     def cmd_save(self, args):
         if len(args)>0:
             print("?")
-            retun
+            return
 
         self.db.update()
         self.db.container.save()
+
+    Command = collections.namedtuple('Command', ['cmd', 'context_check', 'handler', 'completion_handler'])
 
 
     commands = [
@@ -170,6 +194,14 @@ class CLI:
         Command("chpass", lambda cli: True,             cmd_chpass, None),
     ]
 
+    def __init__(self, db):
+        self.db = db
+        self.cur_path=None
+
+    @property
+    def cur_rec(self):
+        return self.db.records[self.cur_path]
+
     def key_bindings(self):
         key_bindings = KeyBindings()
 
@@ -182,10 +214,6 @@ class CLI:
         def _(event):
             event.current_buffer.complete_state = None
         return key_bindings
-
-    def __init__(self, db):
-        self.db = db
-        self.cur_path=None
 
     def handle_cmd(self, text):
         default_cmd = None
