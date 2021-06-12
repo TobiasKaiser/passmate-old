@@ -1,18 +1,23 @@
-Encryption
-==========
+.. _Security:
+Security
+========
 
-Local container encryption
---------------------------
+Passmate provides a basic concept for keeping a database of your secret data (passwords, login credentials etc.) and synchronizing this database across different machines. Both the file system and the synchronization method need to be taken into account when considering the security of your setup. Passmate can use :ref:`container encryption <EncCont>` as an additional security measure to ensure confidentiality and integrity of your secret data both at rest (on your hard drive) and in motion (during synchronization). This additional security layer hinges on the strength and confidentiality of your passphrase.
 
-Passmate uses the scrypt encrypted data format for encrypting the JSON data locally on disk.
+Unencrypted containers
+----------------------
 
-This scrypt-encrypted file is stored in the following locations:
+When an empty container passphrase is entered, Passmate stores the :ref:`JSON database <DB>` as plain JSON text file. In this case, you solely rely on your filesystem and synchronization mechanism to provide the desired information security. Using unencrypted containers is **not recommended**.
 
-- Linux: $HOME/.pmate
-- Mac OS X: ???
-- Windows: ???
+.. _EncCont:
+Encrypted containers
+--------------------
 
-Original description of the format in the scrypt source code: https://github.com/Tarsnap/scrypt/blob/master/FORMAT
+When a non-empty passphrase is entered, Passmate stores the :ref:`JSON database <DB>` in an **encrypted containers**. For best security, use an encrypted containers with a strong passphrase.
+
+When using encrypted containers, a user-defined passphrase guards access to the database. The passphrase needs to be entered when Passmate is launched and is used to derive the encryption and hashing keys to ensure confidentiality and integrity. Scypt has been chosen as key derivation function in order to maximize the effort required for brute-force guessing of the passphrase.
+
+Passmate containers use the scrypt / tarsnap file format specified `here <https://github.com/Tarsnap/scrypt/blob/master/FORMAT>`_:
 
 +--------+----------------+----------------------------------------------------------+
 | offset | length (bytes) | content                                                  |
@@ -38,9 +43,7 @@ Original description of the format in the scrypt source code: https://github.com
 | 96+X   | 32             | HMAC-SHA256(bytes 0 .. 96 + (X - 1))                     |
 +--------+----------------+----------------------------------------------------------+
 
-The lower 256 bits of the scrypt result is used as key for AES256-CTR encryption, the upper 256 bits as key for HMAC-SHA256.
+The 512-bit result of the scypt function is used as follows:
 
-Sync container
---------------
-
-How is the data encrypted during synchronization?
+- The lower 256 bits are used for AES256-CTR.
+- The upper 256 bits are used for HMAC-SHA256.

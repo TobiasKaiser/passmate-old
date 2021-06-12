@@ -11,6 +11,9 @@ Welcome to Passmate's documentation!
    :caption: Contents:
 
    encryption
+   database
+   paths
+   synchronization
    old/index
 
 Indices and tables
