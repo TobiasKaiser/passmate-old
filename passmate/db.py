@@ -2,7 +2,7 @@ import copy
 import collections
 import time
 
-from Cryptodome.Random import get_random_bytes
+import secrets
 import base64
 
 class FieldTuples:
@@ -85,7 +85,7 @@ class Record:
 
     @staticmethod
     def random_key():
-        return base64.b16encode(get_random_bytes(8)).decode("ascii")
+        return base64.b16encode(secrets.token_bytes(8)).decode("ascii")
 
     def __init__(self, db, db_key=None, db_tuples=None):
         self.db = db
