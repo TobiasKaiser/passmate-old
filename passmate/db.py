@@ -1,6 +1,7 @@
 import copy
 import collections
 import time
+from pathlib import Path
 
 import secrets
 import base64
@@ -173,6 +174,22 @@ class Database:
         for r in self.records.values():
             r.mark_as_up_to_date()
 
+    def save(self):
+        self.update()
+        self.container.save()
+        if self.synchronizer.push_fn:
+            Path(self.synchronizer.push_fn).parent.mkdir(parents=True, exist_ok=True)
+            self.container.save(filename=self.synchronizer.push_fn)
+
+    def sync(self):
+        for fn in self.synchronizer.get_pull_filenames:
+            print(fn)
+            remote_container = DatabaseContainer(fn)
+            self.merge(remote_container)
+
+    def merge(self, remote_container):
+        print("TODO")
+
     def migrate_container(self):
         if isinstance(self.container.data, list):
             # Old passmate format [records, config]
@@ -201,3 +218,13 @@ class Synchronizer:
     def __init__(self, push_fn, pull_glob):
         self.push_fn = push_fn
         self.pull_glob = pull_glob
+
+    def get_pull_filenames(self):
+        return glob.glob(self.pull_glob)
+
+class NoSynchronizer(Synchronizer):
+    def __init__(self):
+        self.push_fn = None
+
+    def get_pull_filenames(self):
+        return []

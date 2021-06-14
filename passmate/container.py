@@ -18,27 +18,40 @@ class DatabaseContainer:
         "records":{}
     }
 
-    def __init__(self, fn):
+    def __init__(self, fn, read_only=False):
         self.fn = fn
+        self.create_flag = False
+        self.read_only = read_only
 
     def create(self, passphrase):
-        self.acquire_lock()
-        assert not os.path.exists(self.fn)
-
-        if passphrase:
+        self.passphrase = passphrase
+        if self.passphrase:
             self.is_scrypt_container = True
-            self.passphrase = passphrase
         else:
             self.is_scrypt_container = False
         self.requires_passphrase = False
+        self.create_flag = True
 
+
+    def __enter__(self):
+        if not self.read_only:
+            self.acquire_lock()
+        if self.create_flag:
+            self._create()
+        else:
+            self._open()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if not self.read_only:
+            self.release_lock()
+
+    def _create(self):
+        assert not os.path.exists(self.fn)
         self.data = copy.deepcopy(self.data_template)
-        self.save(create=True)
+        self.save()
 
-
-    def open(self):
-        self.acquire_lock()
-
+    def _open(self):
         with open(self.fn, "rb") as f:
             head = f.read(6)
 
@@ -70,18 +83,16 @@ class DatabaseContainer:
         padded_len = (((len(str_in)-1)//cls.padding_increment)+1)*cls.padding_increment
         return str_in.ljust(padded_len)
 
-    @property
-    def fn_tmp(self):
-        return f"{self.fn}.tmp"
 
-    @property
-    def fn_lock(self):
-        return f"{self.fn}.lock"
-
-    def save(self, create=False):
+    def save(self, filename=None):
         """Save container. To ensure that no inconsistent database is written
         even in the event of a crash, a new container file is written and then
         moved to replace the previous container file."""
+
+        if not filename:
+            filename = self.fn
+
+        fn_tmp = f"{filename}.tmp"
 
         data_plain = json.dumps(self.data)
 
@@ -93,13 +104,17 @@ class DatabaseContainer:
             data_scrypt = scrypt.encrypt(data_plain_padded, self.passphrase,
                 maxtime=self.maxtime, maxmem=self.maxmem, maxmemfrac=self.maxmemfrac)
 
-            with open(self.fn_tmp, "wb") as f:
+            with open(fn_tmp, "wb") as f:
                 f.write(data_scrypt)
         else:
-            with open(self.fn_tmp, "w") as f:
+            with open(fn_tmp, "w") as f:
                 f.write(data_plain)
 
-        shutil.move(self.fn_tmp, self.fn)
+        shutil.move(fn_tmp, filename)
+
+    @property
+    def fn_lock(self):
+        return f"{self.fn}.lock"
 
     def acquire_lock(self):
         """This method acquires a lock via a separate file. A separate file is
@@ -111,5 +126,5 @@ class DatabaseContainer:
         """Releases the lock acquired through acquire_lock()."""
 
         #Do not close before unlink, else someone else might acquire a lock on a file that is deleted immediately afterwards.
-        os.unlink(self.lock_fn)
-        close(self.lock_file)
+        os.unlink(self.fn_lock)
+        self.lock_file.close()

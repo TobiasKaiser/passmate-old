@@ -3,6 +3,7 @@ import argparse
 import collections
 import os.path
 import configparser
+from contextlib import contextmanager
 
 from prompt_toolkit import prompt, PromptSession
 from prompt_toolkit.completion import Completer, Completion
@@ -183,8 +184,7 @@ class CLI:
         if not any_updates:
             print("\t(none)")
 
-        self.db.update()
-        self.db.container.save()
+        self.db.save()
 
     Command = collections.namedtuple('Command', ['cmd', 'context_check', 'handler', 'completion_handler'])
 
@@ -263,41 +263,42 @@ class CLI:
             if self.handle_cmd(text):
                 running=False
 
-
-
-
-def read_conf(conf_fn):
-    conf = configparser.ConfigParser()
-    conf.read(conf_fn)
-
-    container_fn = os.path.expanduser(conf.get("Local", "container"))
-
-    if "Sync" in conf.sections():
-        synchronizer = Synchronizer(
-            push_fn = conf.get("Sync", "push"),
-            pull_glob = conf.get("Sync", "pull")
-        )
-    else:
-        synchronizer = None
-
+@contextmanager
+def open_container(container_fn):
     container = DatabaseContainer(container_fn)
 
-    try:
-        container.open()
-    except FileNotFoundError:
+    if os.path.exists(container_fn):
+        with container:
+            while container.requires_passphrase:
+                passphrase = getpass.getpass(f'Passphrase to open {container_fn}: ')
+                container.decrypt(passphrase)
+            yield container
+    else:
         print(f"Warning: File {container_fn} was not found. Creating a new container.")
         passphrase1 = getpass.getpass(f'Passphrase to create {container_fn}: ')
         passphrase2 = getpass.getpass(f'Repeat passphrase to create {container_fn}: ')
         if passphrase1 != passphrase2:
             raise ValueError("Passphrases did not match.")
-
         container.create(passphrase1)
-    else:
-        while container.requires_passphrase:
-            passphrase = getpass.getpass(f'Passphrase to open {container_fn}: ')
-            container.decrypt(passphrase)
+        with container:
+            yield container
 
-    return Database(container, synchronizer)
+def run_conf(conf_fn):
+    conf = configparser.ConfigParser()
+    conf.read(conf_fn)
+
+    if "Sync" in conf.sections():
+        synchronizer = Synchronizer(
+            push_fn = os.path.expanduser(conf.get("Sync", "push")),
+            pull_glob = os.path.expanduser(conf.get("Sync", "pull"))
+        )
+    else:
+        synchronizer = None
+    
+    container_fn = os.path.expanduser(conf.get("Local", "container"))
+    with open_container(container_fn) as container:
+        db=Database(container, synchronizer)
+        CLI(db).run()
 
 def main():
     ap = argparse.ArgumentParser()
@@ -311,6 +312,4 @@ def main():
     else:
         conf_fn = os.path.expanduser("~/.local/share/passmate/local.conf")
 
-    db = read_conf(conf_fn)
-
-    CLI(db).run()
+    run_conf(conf_fn)
