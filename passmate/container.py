@@ -13,7 +13,10 @@ class DatabaseContainer:
 
     padding_increment = 4096
 
-    data_template = [{}, {}]
+    data_template = {
+        "version":1,
+        "records":{}
+    }
 
     def __init__(self, fn):
         self.fn = fn

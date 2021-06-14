@@ -155,6 +155,7 @@ class Record:
 class Database:
     def __init__(self, container, synchronizer=None):
         self.container=container
+        self.migrate_container()
         self.read_container()
         self.synchronizer = synchronizer
 
@@ -167,18 +168,27 @@ class Database:
     def update(self):
         t = int(time.time())
         for u in self.get_updates():
-            u.apply(self.container.data[0], t)
+            u.apply(self.container.data["records"], t)
 
         for r in self.records.values():
             r.mark_as_up_to_date()
 
+    def migrate_container(self):
+        if isinstance(self.container.data, list):
+            # Old passmate format [records, config]
+            print("Warning: Migrating to new database format.")
+            records = self.container.data[0]
+            self.container.data = copy.deepcopy(self.container.data_template)
+            self.container.data["records"] = records
+
+        assert self.container.data["version"] == 1
 
     def read_container(self):
         """Transforms the container JSON into .records, a dict of Records."""
         
         self.records={}
 
-        for db_key, field_tuples in self.container.data[0].items():
+        for db_key, field_tuples in self.container.data["records"].items():
             tups = FieldTuples(field_tuples)
             rec = Record(self, db_key, tups)
             if not rec.db_path:
