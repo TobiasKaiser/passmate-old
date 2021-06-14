@@ -153,9 +153,10 @@ class Record:
         return f"<Record with fields {keys}>"
 
 class Database:
-    def __init__(self, container):
+    def __init__(self, container, synchronizer=None):
         self.container=container
         self.read_container()
+        self.synchronizer = synchronizer
 
     def get_updates(self):
         updates = []
@@ -185,3 +186,8 @@ class Database:
             if rec.db_path in self.records:
                 raise ValueError("Duplicate record path")
             self.records[rec.db_path] = rec
+
+class Synchronizer:
+    def __init__(self, push_fn, pull_glob):
+        self.push_fn = push_fn
+        self.pull_glob = pull_glob

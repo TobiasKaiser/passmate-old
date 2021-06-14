@@ -1,15 +1,18 @@
-from .db import Database, Record
-from .container import DatabaseContainer
 import getpass
 import argparse
 import collections
-from .hierarchy import PathHierarchy
+import os.path
+import configparser
 
 from prompt_toolkit import prompt, PromptSession
 from prompt_toolkit.completion import Completer, Completion
 from prompt_toolkit.shortcuts import CompleteStyle
 from prompt_toolkit.filters import completion_is_selected, has_completions
 from prompt_toolkit.key_binding import KeyBindings
+
+from .db import Database, Record, Synchronizer
+from .container import DatabaseContainer
+from .hierarchy import PathHierarchy
 
 class PromptCompleter(Completer):
     def __init__(self, cli):
@@ -80,18 +83,23 @@ class PromptCompleter(Completer):
             if key.startswith(text):
                 yield Completion(key, start_position=-len(text))
 
-
 class CLI:
 
     def cmd_return(self, args):
+        if len(args)>0:
+            print("?")
+            return
         self.cur_path = None
 
     def cmd_exit(self, args):
+        if len(args)>0:
+            print("?")
+            return
+
         return True
 
     def cmd_show(self, args):
         if len(args)>0:
-
             if args in self.db.records:
                 self.cur_path = args
             else:
@@ -166,6 +174,14 @@ class CLI:
         if len(args)>0:
             print("?")
             return
+
+        print("Updates:")
+        any_updates=False
+        for u in self.db.get_updates():
+            print("\t"+str(u))
+            any_updates=True
+        if not any_updates:
+            print("\t(none)")
 
         self.db.update()
         self.db.container.save()
@@ -250,40 +266,51 @@ class CLI:
 
 
 
-def cli_get_db():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("container", nargs="?", help="Password database container file")
-    ap.add_argument("-c", "--create", action="store_true", help="Create new password container file")
-    args = ap.parse_args()
+def read_conf(conf_fn):
+    conf = configparser.ConfigParser()
+    conf.read(conf_fn)
 
-    if args.container:
-        container_fn = args.container
+    container_fn = os.path.expanduser(conf.get("Local", "container"))
+
+    if "Sync" in conf.sections():
+        synchronizer = Synchronizer(
+            push_fn = conf.get("Sync", "push"),
+            pull_glob = conf.get("Sync", "pull")
+        )
     else:
-        container_fn = DatabaseContainer.get_default_container_fn()
+        synchronizer = None
 
     container = DatabaseContainer(container_fn)
 
-    if args.create:
+    try:
+        container.open()
+    except FileNotFoundError:
+        print(f"Warning: File {container_fn} was not found. Creating a new container.")
         passphrase1 = getpass.getpass(f'Passphrase to create {container_fn}: ')
         passphrase2 = getpass.getpass(f'Repeat passphrase to create {container_fn}: ')
         if passphrase1 != passphrase2:
             raise ValueError("Passphrases did not match.")
 
         container.create(passphrase1)
-
     else:
-        container.open()
         while container.requires_passphrase:
             passphrase = getpass.getpass(f'Passphrase to open {container_fn}: ')
             container.decrypt(passphrase)
 
-    return Database(container)
+    return Database(container, synchronizer)
 
 def main():
+    ap = argparse.ArgumentParser()
+    #ap.add_argument("-c", "--create", action="store_true", help="Create new password container file")
+    ap.add_argument("conf", nargs="?", help="Passmate config file")
 
+    args = ap.parse_args()    
 
-    db = cli_get_db()
+    if args.conf:
+        conf_fn = args.conf
+    else:
+        conf_fn = os.path.expanduser("~/.local/share/passmate/local.conf")
+
+    db = read_conf(conf_fn)
+
     CLI(db).run()
-
-    
-

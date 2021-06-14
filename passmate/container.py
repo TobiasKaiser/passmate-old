@@ -15,12 +15,6 @@ class DatabaseContainer:
 
     data_template = [{}, {}]
 
-    @staticmethod
-    def get_default_container_fn():
-        from pathlib import Path
-
-        return Path.home().joinpath(".pmate3")
-
     def __init__(self, fn):
         self.fn = fn
 
@@ -33,6 +27,7 @@ class DatabaseContainer:
             self.passphrase = passphrase
         else:
             self.is_scrypt_container = False
+        self.requires_passphrase = False
 
         self.data = copy.deepcopy(self.data_template)
         self.save(create=True)
