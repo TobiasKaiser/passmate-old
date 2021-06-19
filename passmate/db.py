@@ -51,6 +51,10 @@ class DatabaseUpdate:
         self.raw_field_name = raw_field_name
         self.raw_field_values = raw_field_values
 
+    @property
+    def deletes_record(self):
+        return self.raw_field_name == "PATH" and len(self.raw_field_values) == 0
+
     def describe(self):
         if self.raw_field_name == "PATH":
             if len(self.raw_field_values) == 0:
@@ -107,6 +111,8 @@ class Record:
         # .db_fields and .db_path remeber the db state.
         self.fields=copy.deepcopy(self.db_fields)
 
+        self.db.all_records.append(self)
+
     def mark_as_up_to_date(self):
         self.db_fields = copy.deepcopy(self.fields)
         self.db_path = self.get_cur_path()
@@ -161,16 +167,14 @@ class Database:
         self.read_container()
         self.synchronizer = synchronizer
 
-    def get_updates(self):
-        updates = []
-        for r in self.records.values():
-            updates+=r.get_updates()
-        return updates
-
     def update(self):
         t = int(time.time())
-        for u in self.get_updates():
-            u.apply(self.container.data["records"], t)
+        for r in self.all_records:
+            for u in r.get_updates():
+                print(u)
+                u.apply(self.container.data["records"], t)
+                if u.deletes_record:
+                    self.all_records.remove(r)
 
         for r in self.records.values():
             r.mark_as_up_to_date()
@@ -213,9 +217,11 @@ class Database:
         assert self.container.data["version"] == 1
 
     def read_container(self):
-        """Transforms the container JSON into .records, a dict of Records."""
+        """Transforms the container JSON into .records, a dict of Records.
+        Calling this mehtod resets all unsaved changed to the .records attribute."""
         
         self.records={}
+        self.all_records=[] # Required to find deleted records
 
         for db_key, field_tuples in self.container.data["records"].items():
             tups = FieldTuples(field_tuples)

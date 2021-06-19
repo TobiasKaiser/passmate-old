@@ -170,18 +170,26 @@ class CLI:
 
         print("Updates:")
         any_updates=False
-        for u in self.db.get_updates():
-            print("\t"+str(u))
-            any_updates=True
-        if not any_updates:
-            print("\t(none)")
+        #for u in self.db.dates():
+        #    print("\t"+str(u))
+        #    any_updates=True
+        #if not any_updates:
+        #    print("\t(none)")
 
         self.db.save()
 
-    # Todo
 
     def cmd_rename(self, args):
-        print(f"todo: unset {args}")
+        if len(args)==0:
+            print("?")
+
+        if (args in self.db.records):
+            print("Record already exists.")
+            return
+
+        self.db.records[args] = self.db.records[self.cur_path]
+        del self.db.records[self.cur_path]
+        self.cur_path = args
 
     def cmd_new(self, args):
         if len(args)==0:
@@ -196,15 +204,19 @@ class CLI:
         self.db.records[self.cur_path] = Record(self.db)
 
     def cmd_del(self, args):
-        print(f"todo: new {args}")
+        if len(args)>0:
+            print("?")
+            return
+
+        del self.db.records[self.cur_path]
+        self.cur_path = None
+
+    # Todo:
 
     def cmd_chpass(self, args):
         print(f"todo: chpass {args}")
 
-
-
     Command = collections.namedtuple('Command', ['cmd', 'context_check', 'handler', 'completion_handler'])
-
 
     commands = [
         # Commands in root mode
