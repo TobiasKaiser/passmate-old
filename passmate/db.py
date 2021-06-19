@@ -2,6 +2,7 @@ import copy
 import collections
 import time
 from pathlib import Path
+import glob
 
 import secrets
 import base64
@@ -179,16 +180,26 @@ class Database:
         self.container.save()
         if self.synchronizer.push_fn:
             Path(self.synchronizer.push_fn).parent.mkdir(parents=True, exist_ok=True)
-            self.container.save(filename=self.synchronizer.push_fn)
+            self.container.save(filename=self.synchronizer.push_fn, working_copy=False)
 
-    def sync(self):
-        for fn in self.synchronizer.get_pull_filenames:
-            print(fn)
-            remote_container = DatabaseContainer(fn)
-            self.merge(remote_container)
 
-    def merge(self, remote_container):
-        print("TODO")
+    def merge(self, rc):
+        # rc = remote container
+        """Warning: this writes straight to self.container.data and invalidates
+        all changes to self.records that were not saved prior to the merge() call."""
+        for db_key, field_tuples in rc.data["records"].items():
+            if db_key in self.container.data["records"]:
+                # Merge
+                for tup in field_tuples:
+                    if not tup in self.container.data["records"][db_key]:
+                        print(db_key, tup)
+                        self.container.data["records"][db_key].append(tup)
+            else:
+                # Add new record
+                self.container.data["records"][db_key] = field_tuples
+
+        self.read_container()
+
 
     def migrate_container(self):
         if isinstance(self.container.data, list):
@@ -220,7 +231,9 @@ class Synchronizer:
         self.pull_glob = pull_glob
 
     def get_pull_filenames(self):
-        return glob.glob(self.pull_glob)
+        for fn in glob.glob(self.pull_glob):
+            if fn != self.push_fn:
+                yield fn
 
 class NoSynchronizer(Synchronizer):
     def __init__(self):

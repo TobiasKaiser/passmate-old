@@ -65,6 +65,8 @@ class DatabaseContainer:
             # Load plaintext json
             with open(self.fn, "r") as f:
                 self.data = json.load(f)
+                if (not self.read_only) and ("working_copy" in self.data) and (not self.data["working_copy"]):
+                    raise Exception("Attempted to open non-working copy for writing.")
 
     def decrypt(self, passphrase):
         assert self.is_scrypt_container and self.requires_passphrase
@@ -84,7 +86,7 @@ class DatabaseContainer:
         return str_in.ljust(padded_len)
 
 
-    def save(self, filename=None):
+    def save(self, filename=None, working_copy=True):
         """Save container. To ensure that no inconsistent database is written
         even in the event of a crash, a new container file is written and then
         moved to replace the previous container file."""
@@ -93,6 +95,9 @@ class DatabaseContainer:
             filename = self.fn
 
         fn_tmp = f"{filename}.tmp"
+
+        data_extended = copy.copy(self.data)
+        data_extended["working_copy"] = working_copy
 
         data_plain = json.dumps(self.data)
 

@@ -148,6 +148,36 @@ class CLI:
 
         del self.cur_rec.fields[field_name]
 
+    def cmd_sync(self, args):
+        if len(args)>0:
+            print("?")
+            return
+
+        self.cmd_save("")
+
+        # TODO: Error handling / prompting for passphrase
+        for fn in self.db.synchronizer.get_pull_filenames():
+            # rc = remote container
+            with DatabaseContainer(fn, read_only=True) as rc:
+                if rc.requires_passphrase:
+                    rc.decrypt(self.db.container.passphrase)
+                self.db.merge(rc)
+
+    def cmd_save(self, args):
+        if len(args)>0:
+            print("?")
+            return
+
+        print("Updates:")
+        any_updates=False
+        for u in self.db.get_updates():
+            print("\t"+str(u))
+            any_updates=True
+        if not any_updates:
+            print("\t(none)")
+
+        self.db.save()
+
     # Todo
 
     def cmd_rename(self, args):
@@ -171,20 +201,7 @@ class CLI:
     def cmd_chpass(self, args):
         print(f"todo: chpass {args}")
 
-    def cmd_save(self, args):
-        if len(args)>0:
-            print("?")
-            return
 
-        print("Updates:")
-        any_updates=False
-        for u in self.db.get_updates():
-            print("\t"+str(u))
-            any_updates=True
-        if not any_updates:
-            print("\t(none)")
-
-        self.db.save()
 
     Command = collections.namedtuple('Command', ['cmd', 'context_check', 'handler', 'completion_handler'])
 
@@ -204,6 +221,7 @@ class CLI:
         Command("show",   lambda cli: True,             cmd_show,   PromptCompleter.handle_path),
         Command("ls",     lambda cli: True,             cmd_ls,     None),
         Command("save",   lambda cli: True,             cmd_save,   None),
+        Command("sync",   lambda cli: True,             cmd_sync,   None),
         Command("exit",   lambda cli: True,             cmd_exit,   None),
         Command("new",    lambda cli: True,             cmd_new,    PromptCompleter.handle_path),
         Command("del",    lambda cli: True,             cmd_del,    PromptCompleter.handle_path),
