@@ -192,11 +192,12 @@ class Database:
                 # Merge
                 for tup in field_tuples:
                     if not tup in self.container.data["records"][db_key]:
-                        print(db_key, tup)
+                        print("tuple added:", db_key, tup)
                         self.container.data["records"][db_key].append(tup)
             else:
                 # Add new record
                 self.container.data["records"][db_key] = field_tuples
+                print("record added:", db_key, field_tuples)
 
         self.read_container()
 
