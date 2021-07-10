@@ -182,7 +182,7 @@ class Database:
     def save(self):
         self.update()
         self.container.save()
-        if self.synchronizer.push_fn:
+        if self.synchronizer and self.synchronizer.push_fn:
             Path(self.synchronizer.push_fn).parent.mkdir(parents=True, exist_ok=True)
             self.container.save(filename=self.synchronizer.push_fn, working_copy=False)
 
