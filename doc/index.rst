@@ -10,7 +10,7 @@ Welcome to Passmate's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-   encryption
+   security
    database
    paths
    synchronization

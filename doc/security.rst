@@ -1,8 +1,11 @@
 .. _Security:
+
 Security
 ========
 
 Passmate provides a basic concept for keeping a database of your secret data (passwords, login credentials etc.) and synchronizing this database across different machines. Both the file system and the synchronization method need to be taken into account when considering the security of your setup. Passmate can use :ref:`container encryption <EncCont>` as an additional security measure to ensure confidentiality and integrity of your secret data both at rest (on your hard drive) and in motion (during synchronization). This additional security layer hinges on the strength and confidentiality of your passphrase.
+
+.. image:: figures/security.png
 
 Unencrypted containers
 ----------------------
@@ -10,6 +13,7 @@ Unencrypted containers
 When an empty container passphrase is entered, Passmate stores the :ref:`JSON database <DB>` as plain JSON text file. In this case, you solely rely on your filesystem and synchronization mechanism to provide the desired information security. Using unencrypted containers is **not recommended**.
 
 .. _EncCont:
+
 Encrypted containers
 --------------------
 
