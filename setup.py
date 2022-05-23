@@ -1,7 +1,7 @@
 import setuptools
 
 setuptools.setup(
-    name="passmate",
+    name="passmate_legacy",
     version="0.3",
     author="Tobias Kaiser",
     author_email="mail@tb-kaiser.de",
@@ -10,8 +10,7 @@ setuptools.setup(
     python_requires=">=3.6",
     entry_points={
         "console_scripts": [
-            "passmate-qt = passmate.gui.gui:main",
-            "passmate    = passmate.cli:main"
+            "passmate-legacy    = passmate_legacy.cli:main"
         ]
     }
 )
